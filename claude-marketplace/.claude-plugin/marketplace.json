@@ -1,0 +1,58 @@
+{
+  "name": "local-dev-tools",
+  "owner": {
+    "name": "selvar2",
+    "email": "selvarajaa13@gmail.com"
+  },
+  "metadata": {
+    "description": "A collection of useful development plugins for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "review-plugin",
+      "source": "./plugins/review-plugin",
+      "description": "Adds a /review command for quick code reviews",
+      "version": "1.0.0",
+      "author": {
+        "name": "selvar2"
+      }
+    },
+    {
+      "name": "explain-plugin",
+      "source": "./plugins/explain-plugin",
+      "description": "Adds an /explain command to explain code in detail",
+      "version": "1.0.0",
+      "author": {
+        "name": "selvar2"
+      }
+    },
+    {
+      "name": "test-plugin",
+      "source": "./plugins/test-plugin",
+      "description": "Adds a /gentest command to generate unit tests",
+      "version": "1.0.0",
+      "author": {
+        "name": "selvar2"
+      }
+    },
+    {
+      "name": "prompt-optimizer-plugin",
+      "source": "./plugins/prompt-optimizer-plugin",
+      "description": "Optimize any prompt before execution. Available as /optimize command, prompt-optimizer-skill, and prompt-optimizer-sub-agent.",
+      "version": "1.0.0",
+      "author": {
+        "name": "selvar2"
+      }
+    },
+    {
+      "name": "sys-prompt-generator",
+      "source": "./plugins/sys-prompt-generator",
+      "description": "Generate production-ready AI system prompts. Available as /generate-system-prompt (one-shot), /system-prompt-generator (interactive), and sys-prompt-agent (autonomous sub-agent).",
+      "version": "1.0.0",
+      "author": {
+        "name": "selvar2"
+      }
+    }
+  ]
+}

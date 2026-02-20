@@ -1,0 +1,5 @@
+{
+  "name": "sys-prompt-generator",
+  "description": "Generate production-ready AI system prompts. Available as /generate-system-prompt (one-shot), /system-prompt-generator (interactive), and sys-prompt-agent (autonomous sub-agent).",
+  "version": "1.0.0"
+}
