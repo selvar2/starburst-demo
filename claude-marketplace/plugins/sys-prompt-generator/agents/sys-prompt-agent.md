@@ -2,13 +2,8 @@
 name: sys-prompt-agent
 description: "Autonomous system prompt engineering agent. Analyzes requirements, decomposes tasks, and generates production-ready system prompts with structured role definitions, constraints, reasoning frameworks, negative prompts, few-shot examples, and output format specifications. Use when generating or refining AI system prompts."
 model: opus
-tools:
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-color: orange
+tools: Read, Write, Edit, Bash, Glob, Grep
+color: magenta
 ---
 
 # System Prompt Engineering Agent
