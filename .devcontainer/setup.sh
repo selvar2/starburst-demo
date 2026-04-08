@@ -1,34 +1,87 @@
 #!/usr/bin/env bash
 # setup.sh — runs once after container creation (postCreateCommand)
-# Idempotent: safe to re-run on rebuilds.
+# Always does a FRESH install — no caching, no skipping.
 set -euo pipefail
 
 PROJECT_DIR="gen ai project/starburst-mcp2"
 
-echo "=== Starburst MCP: postCreateCommand ==="
+echo "============================================"
+echo "  Starburst MCP: postCreateCommand (setup)"
+echo "============================================"
 
-# Ensure python3 is available
-if ! command -v python3 &>/dev/null; then
-    echo "ERROR: python3 not found. Aborting."
+# ── 1. Detect environment ──────────────────────
+if [ "${CODESPACES:-}" = "true" ]; then
+    echo "[ENV] GitHub Codespaces detected"
+elif [ "${REMOTE_CONTAINERS:-}" = "true" ]; then
+    echo "[ENV] VS Code Remote Container detected"
+else
+    echo "[ENV] Local / other environment"
+fi
+
+# ── 2. Verify Python ───────────────────────────
+if command -v python3 &>/dev/null; then
+    PYTHON=python3
+elif command -v python &>/dev/null; then
+    PYTHON=python
+else
+    echo "[ERROR] No python found. Aborting."
+    exit 1
+fi
+echo "[OK] Python found: $($PYTHON --version) at $(which $PYTHON)"
+
+# ── 3. Fresh install — wipe cached packages ────
+echo "[INSTALL] Upgrading pip..."
+$PYTHON -m pip install --upgrade pip --force-reinstall -q
+
+echo "[INSTALL] Installing ALL dependencies from scratch..."
+if [ -f "$PROJECT_DIR/requirements.txt" ]; then
+    $PYTHON -m pip install --force-reinstall -r "$PROJECT_DIR/requirements.txt" -q
+    echo "[OK] All dependencies installed (fresh)."
+else
+    echo "[ERROR] $PROJECT_DIR/requirements.txt not found!"
     exit 1
 fi
 
-echo "Python: $(python3 --version)"
+# ── 4. Verify critical packages ────────────────
+echo "[VERIFY] Checking core imports..."
+$PYTHON -c "
+import trino
+import mcp
+import dotenv
+import yaml
+print(f'  trino={trino.__version__ if hasattr(trino, \"__version__\") else \"ok\"}')
+print(f'  mcp={mcp.__version__ if hasattr(mcp, \"__version__\") else \"ok\"}')
+print('  dotenv=ok')
+print('  yaml=ok')
+"
+echo "[OK] All core packages verified."
 
-# Install dependencies
-if [ -f "$PROJECT_DIR/requirements.txt" ]; then
-    echo "Installing Python dependencies..."
-    pip install --upgrade pip -q
-    pip install -r "$PROJECT_DIR/requirements.txt" -q
-    echo "Dependencies installed."
+# ── 5. Check .env exists ───────────────────────
+if [ -f "$PROJECT_DIR/.env" ]; then
+    echo "[OK] .env file found at $PROJECT_DIR/.env"
 else
-    echo "WARNING: $PROJECT_DIR/requirements.txt not found. Skipping pip install."
+    if [ -f "$PROJECT_DIR/.env.example" ]; then
+        cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+        echo "[WARN] Created .env from .env.example — fill in your credentials."
+    else
+        echo "[WARN] No .env file found. MCP server will start but cannot connect to Starburst."
+        echo "       Create: $PROJECT_DIR/.env with your credentials."
+    fi
 fi
 
-# Copy .env.example if .env is missing (secrets stay out of git)
-if [ -f "$PROJECT_DIR/.env.example" ] && [ ! -f "$PROJECT_DIR/.env" ]; then
-    cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-    echo "Created .env from .env.example — fill in your credentials."
-fi
+# ── 6. Validate server.py is loadable ──────────
+echo "[VERIFY] Checking server.py imports..."
+$PYTHON -c "
+import sys
+sys.path.insert(0, '$PROJECT_DIR')
+from starburst_client import StarburstClient
+from permission_manager import PermissionManager
+from tools import register_read_tools, register_write_tools
+from mcp.server.fastmcp import FastMCP
+print('  All server modules loadable.')
+"
+echo "[OK] Server validated."
 
-echo "=== Setup complete ==="
+echo "============================================"
+echo "  Setup complete — MCP server ready"
+echo "============================================"
