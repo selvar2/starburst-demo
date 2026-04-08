@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from trino.dbapi import connect
-from trino.auth import BasicAuthentication
+from trino.auth import BasicAuthentication, OAuth2Authentication
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -32,11 +32,20 @@ class StarburstClient:
 
         self.user = os.getenv("STARBURST_USER")
         self.password = os.getenv("STARBURST_PASSWORD")
-        self.auth_mode = "basic"
+
+        # OAuth primary, BasicAuth fallback
+        if os.getenv("STARBURST_CLIENT_ID"):
+            self.auth_mode = "oauth"
+        elif self.user and self.password:
+            self.auth_mode = "basic"
+        else:
+            self.auth_mode = "oauth"
 
         self._conn = None
 
     def _get_auth(self):
+        if self.auth_mode == "oauth":
+            return OAuth2Authentication()
         return BasicAuthentication(self.user, self.password)
 
     def get_connection(self):
