@@ -5,3 +5,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.playwright-mcp/
+.mcp.json
+.claude/
+starburst-mcp2-session.md
