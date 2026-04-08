@@ -7,9 +7,10 @@ Validates identifiers to prevent SQL injection.
 import os
 import re
 from pathlib import Path
+
 from dotenv import load_dotenv
 from trino.dbapi import connect
-from trino.auth import BasicAuthentication, OAuth2Authentication
+from trino.auth import BasicAuthentication
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -29,24 +30,26 @@ class StarburstClient:
         self.catalog = os.getenv("STARBURST_CATALOG")
         self.schema = os.getenv("STARBURST_SCHEMA")
 
-        self.client_id = os.getenv("STARBURST_CLIENT_ID")
-        self.client_secret = os.getenv("STARBURST_CLIENT_SECRET")
-        self.token_url = os.getenv("STARBURST_TOKEN_URL")
         self.user = os.getenv("STARBURST_USER")
         self.password = os.getenv("STARBURST_PASSWORD")
+        self.auth_mode = "basic"
 
-        if self.client_id and self.client_secret:
-            self.auth_mode = "oauth"
-        else:
-            self.auth_mode = "basic"
+        self._conn = None
 
     def _get_auth(self):
-        if self.auth_mode == "oauth":
-            return OAuth2Authentication()
         return BasicAuthentication(self.user, self.password)
 
     def get_connection(self):
-        return connect(
+        if self._conn is not None:
+            try:
+                cur = self._conn.cursor()
+                cur.execute("SELECT 1")
+                cur.fetchall()
+                return self._conn
+            except Exception:
+                self._conn = None
+
+        self._conn = connect(
             host=self.host,
             port=self.port,
             http_scheme="https",
@@ -54,6 +57,7 @@ class StarburstClient:
             catalog=self.catalog,
             schema=self.schema,
         )
+        return self._conn
 
     _DML_RE = re.compile(
         r"^\s*(INSERT|UPDATE|DELETE|TRUNCATE|CREATE|DROP|ALTER|MERGE|GRANT|REVOKE)\b",
@@ -83,8 +87,9 @@ class StarburstClient:
             except Exception:
                 pass
             return {"rows_affected": 0, "status": "ok"}
-        finally:
-            conn.close()
+        except Exception:
+            self._conn = None
+            raise
 
     @staticmethod
     def validate_identifier(name: str):
