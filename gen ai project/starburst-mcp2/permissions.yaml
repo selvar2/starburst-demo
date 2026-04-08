@@ -1,0 +1,60 @@
+defaults:
+  read: true
+  insert: true
+  update: false
+  delete: false
+  create_schema: false
+  create_table: false
+  drop_table: false
+  drop_schema: false
+  truncate: false
+  merge: false
+  execute_raw: false
+
+profiles:
+  read_only:
+    read: true
+
+  analyst:
+    insert: true
+    update: true
+    delete: true
+    create_table: true
+
+  engineer:
+    insert: true
+    update: true
+    delete: true
+    create_schema: true
+    create_table: true
+    drop_table: true
+    truncate: true
+    merge: true
+
+  admin:
+    insert: true
+    update: true
+    delete: true
+    create_schema: true
+    create_table: true
+    drop_table: true
+    drop_schema: true
+    truncate: true
+    merge: true
+    execute_raw: true
+
+developers:
+  prakashrajr666:
+    profile: admin
+
+  dev_analyst_1:
+    profile: analyst
+
+  dev_intern:
+    profile: read_only
+
+  dev_custom:
+    profile: analyst
+    overrides:
+      drop_table: true
+      truncate: true
