@@ -55,9 +55,15 @@ class StarburstClient:
             schema=self.schema,
         )
 
+    _DML_RE = re.compile(
+        r"^\s*(INSERT|UPDATE|DELETE|TRUNCATE|CREATE|DROP|ALTER|MERGE|GRANT|REVOKE)\b",
+        re.IGNORECASE,
+    )
+
     def execute(self, query: str) -> dict:
         """Execute a query. Returns {columns, rows} for SELECT or {rows_affected} for DML/DDL."""
         query = query.strip().rstrip(";")
+        is_dml = bool(self._DML_RE.match(query))
         conn = self.get_connection()
         try:
             cur = conn.cursor()
@@ -65,6 +71,10 @@ class StarburstClient:
             if cur.description:
                 columns = [desc[0] for desc in cur.description]
                 rows = cur.fetchall()
+                # DML statements (INSERT/UPDATE/DELETE) return {"rows": [[N]]} from Trino
+                # Normalise to rows_affected for callers
+                if is_dml and columns == ["rows"] and len(rows) == 1 and len(rows[0]) == 1:
+                    return {"rows_affected": rows[0][0]}
                 return {"columns": columns, "rows": rows}
             try:
                 rows = cur.fetchall()
