@@ -81,8 +81,9 @@ def _headless_login(url: str, galaxy_host: str, email: str, password: str):
 
     Steps:
         1. POST /api/v1/login with email + password
-        2. GET the initiate URL (sets cookies)
-        3. GET /oauth/v2/redirect (completes callback)
+        2. GET the initiate URL (gets 303 → authorize URL)
+        3. Follow the authorize URL (gets the auth code)
+        4. GET /oauth/v2/redirect (completes callback)
     """
     s = http_requests.Session()
     s.post(
@@ -91,7 +92,10 @@ def _headless_login(url: str, galaxy_host: str, email: str, password: str):
         headers={"Content-Type": "application/json"},
         timeout=15,
     )
-    s.get(url, allow_redirects=False, timeout=15)
+    r2 = s.get(url, allow_redirects=False, timeout=15)
+    authorize_url = r2.headers.get("Location")
+    if authorize_url:
+        s.get(authorize_url, allow_redirects=True, timeout=15)
     s.get(f"https://{galaxy_host}/oauth/v2/redirect", allow_redirects=True, timeout=15)
 
 

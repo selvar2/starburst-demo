@@ -11,7 +11,6 @@ import os
 import re
 import webbrowser
 from pathlib import Path
-from unittest.mock import patch
 
 import requests as http_requests
 from dotenv import load_dotenv
@@ -37,19 +36,23 @@ class _HeadlessOAuth:
         self.email = email
         self.password = password
 
-    def handle_redirect(self, url: str):
-        """Called instead of webbrowser.open — completes OAuth programmatically."""
+    def handle_redirect(self, url: str, *args, **kwargs):
+        """Called instead of webbrowser.open/open_new — completes OAuth programmatically."""
         s = http_requests.Session()
-        # Step 1: Login to Galaxy
+        # Step 1: Login to Galaxy portal
         s.post(
             f"https://{self.galaxy_host}/api/v1/login",
             json={"email": self.email, "password": self.password},
             headers={"Content-Type": "application/json"},
             timeout=15,
         )
-        # Step 2: Follow the initiate URL (sets authorize cookies)
-        s.get(url, allow_redirects=False, timeout=15)
-        # Step 3: Hit redirect endpoint to complete the callback
+        # Step 2: Hit the initiate URL — returns 303 → authorize URL
+        r2 = s.get(url, allow_redirects=False, timeout=15)
+        # Step 3: Follow the authorize redirect (gets the auth code)
+        authorize_url = r2.headers.get("Location")
+        if authorize_url:
+            s.get(authorize_url, allow_redirects=True, timeout=15)
+        # Step 4: Hit redirect endpoint to complete the callback
         s.get(
             f"https://{self.galaxy_host}/oauth/v2/redirect",
             allow_redirects=True,
@@ -81,6 +84,12 @@ class StarburstClientJWT:
         self.auth_mode = "jwt"
         self._conn = None
 
+        # Permanently patch webbrowser so ALL OAuth redirects are handled
+        # headlessly — including token refreshes on later queries.
+        webbrowser.open = self._headless.handle_redirect
+        webbrowser.open_new = self._headless.handle_redirect
+        webbrowser.open_new_tab = self._headless.handle_redirect
+
     def _get_auth(self):
         return OAuth2Authentication()
 
@@ -94,20 +103,18 @@ class StarburstClientJWT:
             except Exception:
                 self._conn = None
 
-        # Monkey-patch webbrowser.open to do headless OAuth
-        with patch("webbrowser.open", side_effect=self._headless.handle_redirect):
-            self._conn = connect(
-                host=self.host,
-                port=self.port,
-                http_scheme="https",
-                auth=self._get_auth(),
-                catalog=self.catalog,
-                schema=self.schema,
-            )
-            # Force a connection to trigger auth now
-            cur = self._conn.cursor()
-            cur.execute("SELECT 1")
-            cur.fetchall()
+        self._conn = connect(
+            host=self.host,
+            port=self.port,
+            http_scheme="https",
+            auth=self._get_auth(),
+            catalog=self.catalog,
+            schema=self.schema,
+        )
+        # Force a connection to trigger auth now
+        cur = self._conn.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchall()
 
         return self._conn
 
