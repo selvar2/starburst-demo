@@ -14,13 +14,13 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from starburst_client import StarburstClient
+from starburst_client_jwt import StarburstClientJWT as StarburstClient
 
 # ---------------------------------------------------------------------------
 # App & client
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Starburst Galaxy Chatbot")
+app = FastAPI(title="Starburst Galaxy Chatbot (JWT)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -349,7 +349,7 @@ def _fetch_schema():
         for table_name in table_names:
             all_tasks.append((schema_name, table_name))
 
-    table_data = {}
+    table_data = {}  # (schema, table) -> {name, columns}
     with ThreadPoolExecutor(max_workers=min(len(all_tasks), 10)) as pool:
         futures = {
             pool.submit(_describe_table, catalog, s, t): (s, t)

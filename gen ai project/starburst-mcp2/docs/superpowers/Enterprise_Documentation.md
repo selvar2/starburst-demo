@@ -285,3 +285,399 @@ id=6: 2 row(s) returned — SELECT *
 ## Conclusion
 
 This session transformed the MCP server from a Windows-only, popup-riddled development setup into a fully portable, demo-ready system. The server now operates headlessly with BasicAuth, reuses connections for performance, auto-installs dependencies on container lifecycle events, and has been validated with a complete CRUD test cycle against live Starburst Galaxy infrastructure. All changes are pushed to `dev1`.
+
+---
+---
+
+# Version 2: StarQuery AI — Chatbot Web UI, JWT Auth & Data Visualization
+## Session Date: 2026-04-14/15 | Branch: `dev3` | Author: AI Pair Programmer (Claude Opus 4.6)
+
+---
+
+## Overview
+
+This session built a complete **chatbot-driven web application** (StarQuery AI) on top of the Starburst MCP server, adding:
+
+1. **Natural Language to SQL Translation** — Regex-based NL→SQL engine with dynamic catalog/schema context parsing
+2. **Interactive Web UI** — Single-page application with dark/light mode, schema browser, Chart.js visualizations, and multi-format exports
+3. **Headless JWT Authentication** — Programmatic OAuth2 flow that eliminates browser popups entirely
+4. **Token Caching** — Persistent token storage to disk with auto-refresh
+5. **Performance Optimization** — Parallel schema fetching via ThreadPoolExecutor, in-memory schema cache with TTL
+6. **Cluster Keepalive** — Background process pinging Starburst every 60 seconds with log rotation
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    StarQuery AI — Frontend                   │
+│  ┌──────────┐  ┌────────────────────┐  ┌─────────────────┐  │
+│  │ Sidebar  │  │   Chat Interface   │  │ Chart Config    │  │
+│  │ Schema   │  │ Messages + Tables  │  │ Type/Axis/Color │  │
+│  │ Browser  │  │ Charts + Exports   │  │ Panel           │  │
+│  └──────────┘  └────────────────────┘  └─────────────────┘  │
+│  index.html (Tailwind + Chart.js + SheetJS + html2canvas)   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ fetch() REST API
+              ┌───────▼───────┐
+              │  FastAPI       │
+              │  app_jwt.py    │
+              │  ┌───────────┐ │
+              │  │ NL→SQL    │ │  Regex patterns + raw SQL passthrough
+              │  │ Translator│ │  Dynamic catalog/schema context parsing
+              │  └───────────┘ │
+              │  ┌───────────┐ │
+              │  │ Schema    │ │  5-min TTL cache + parallel fetch
+              │  │ Cache     │ │  ThreadPoolExecutor (10 workers)
+              │  └───────────┘ │
+              │  ┌───────────┐ │
+              │  │ Export    │ │  CSV, XLSX (openpyxl), HTML
+              │  │ Engine    │ │
+              │  └───────────┘ │
+              └───────┬───────┘
+                      │ StarburstClientJWT
+                      │ (headless OAuth2 — no browser)
+              ┌───────▼───────┐
+              │  Starburst     │
+              │  Galaxy        │
+              │  mcp2ohio      │
+              │  (Iceberg/S3)  │
+              └───────────────┘
+```
+
+---
+
+## Environment Setup
+
+### Prerequisites
+
+```bash
+pip install fastapi uvicorn[standard] openpyxl python-multipart trino python-dotenv pyyaml requests
+```
+
+### .env Configuration
+
+```env
+STARBURST_HOST=datateam-free-cluster.trino.galaxy.starburst.io
+STARBURST_PORT=443
+STARBURST_CATALOG=mcp2ohio
+STARBURST_SCHEMA=test_writes
+STARBURST_USER=your_email@company.com/accountadmin
+STARBURST_PASSWORD=your_password
+STARBURST_CLIENT_ID=service_name@domain.galaxy.starburst.io
+STARBURST_CLIENT_SECRET=GXY$your_secret_here
+```
+
+### File Structure
+
+```
+gen ai project/starburst-mcp2/
+├── app.py                      # FastAPI server (original OAuth client)
+├── app_jwt.py                  # FastAPI server (JWT headless auth)
+├── index.html                  # StarQuery AI frontend (single-page app)
+├── starburst_client.py         # Original client (browser OAuth popup)
+├── starburst_client_jwt.py     # JWT client (headless, no browser)
+├── token_cache.py              # Token persistence to disk
+├── keepalive.py                # Cluster keepalive (every 60s)
+├── keepalive.log               # Keepalive log (auto-trimmed to 10 entries)
+├── token_cache.json            # Cached token (auto-created)
+├── STARBURST-AUTH.md           # Auth reference for AI agents
+├── server.py                   # MCP server entry point (unchanged)
+├── permission_manager.py       # Permission system (unchanged)
+├── permissions.yaml            # Permission config (unchanged)
+├── .env                        # Credentials (never committed)
+├── backups/                    # Timestamped backups
+│   ├── app_backup_20260415_070104.py
+│   ├── app_jwt_backup_20260415_070104.py
+│   └── app_backup_20260415_072525.py
+└── docs/superpowers/
+    ├── Enterprise_Documentation.md
+    └── End_User_Documentation.md
+```
+
+---
+
+## Implementation Steps
+
+### 1. FastAPI Backend (`app.py` / `app_jwt.py`)
+
+#### API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/` | Serve `index.html` |
+| `GET` | `/api/schema?refresh=0\|1` | Schema browser data (cached, parallel fetch) |
+| `POST` | `/api/query` | Execute raw SQL |
+| `POST` | `/api/chat` | NL→SQL translation + execution |
+| `POST` | `/api/export/{csv\|xlsx\|html}` | Export data as file download |
+
+#### NL→SQL Translation Engine
+
+The `_nl_to_sql()` function processes natural language in this order:
+
+1. **Exact matches** — `show all tables`, `show schemas` → direct SQL
+2. **Raw SQL passthrough** — if input starts with SQL keyword + contains dots → execute as-is
+3. **Regex NL patterns** — `describe X`, `show all data from X`, `count rows in X`, `top N col from X`, `sum/avg/min/max of col from X`, `group by col from X`
+4. **Fallback raw SQL** — any remaining SQL keyword input → passthrough
+5. **No match** → return help message with examples
+
+#### Dynamic Context Parsing
+
+The `_extract_context()` function parses catalog/schema from NL input:
+
+```python
+# Input: "show all data from iceberg_tables, iceberg_tables is part of system schema and part of mcp2ohio catalog"
+# Extracted: catalog=mcp2ohio, schema=system
+# Generated SQL: SELECT * FROM mcp2ohio.system.iceberg_tables LIMIT 100
+```
+
+Supported patterns:
+- `from X schema in Y catalog`
+- `is part of X schema and part of Y catalog`
+- `in X schema`
+- `in Y catalog`
+
+#### Cross-Schema Table Lookup
+
+When a table is not found in the default schema, `_try_other_schemas()` searches:
+1. In-memory schema cache (instant)
+2. Fallback: `information_schema.tables` query (single round-trip)
+
+#### Aggregate Column Aliasing
+
+```python
+# Before: SELECT name, COUNT(*) FROM demo GROUP BY name → columns: [name, _col1]
+# After:  SELECT name, COUNT(*) AS count FROM demo GROUP BY name → columns: [name, count]
+```
+
+Regex `_AGG_ALIAS_RE` adds aliases to `COUNT`, `SUM`, `AVG`, `MIN`, `MAX` functions without existing `AS` clauses.
+
+### 2. Parallel Schema Fetching
+
+**Problem:** Sequential schema fetch made 1 + N + M queries (SHOW SCHEMAS + SHOW TABLES per schema + DESCRIBE per table). With 3 schemas and 14 tables = ~37 seconds.
+
+**Solution:** Three-step parallel pipeline:
+
+```python
+# Step 1: SHOW SCHEMAS (single query)
+# Step 2: SHOW TABLES for all schemas in parallel (ThreadPoolExecutor)
+# Step 3: DESCRIBE for all tables across all schemas in parallel (max 10 workers)
+```
+
+**Result:** 37s → 16s (57% reduction)
+
+Additional optimizations:
+- 5-minute TTL in-memory cache (`_schema_cache`)
+- Background thread pre-warm on startup
+- `?refresh=1` query param to bust cache
+- Frontend refresh button (↻) with spin animation
+
+### 3. Headless JWT Authentication (`starburst_client_jwt.py`)
+
+**Problem:** Starburst Galaxy's `OAuth2Authentication()` opens a browser for interactive login on every first connection.
+
+**Discovery Process:**
+1. Starburst Galaxy does NOT support `client_credentials` grant (token endpoint returns 405)
+2. Galaxy service accounts work as BasicAuth credentials, but user required JWT specifically
+3. Found Galaxy's SPA login API by inspecting JS bundles
+
+**Solution:** Intercept `webbrowser.open` and complete OAuth programmatically:
+
+```python
+# Step 1: POST /api/v1/login {email, password} → 200 (session cookie set)
+# Step 2: GET initiate_url (from Trino 401 challenge) → sets authorize cookies
+# Step 3: GET /oauth/v2/redirect → 303 → callback with auth code (completes flow)
+```
+
+Implementation uses `unittest.mock.patch("webbrowser.open", side_effect=handler)` to monkey-patch the browser call. Trino client internally caches and auto-refreshes the token.
+
+### 4. Token Cache (`token_cache.py`)
+
+```python
+# First run:
+#   → No token_cache.json → headless login → save {host, email, created_at, expires_at}
+# Second run:
+#   → Found token_cache.json → check expires_at → if valid, skip login
+# Expired:
+#   → expires_at < now → headless login again → overwrite file
+```
+
+CLI test:
+```bash
+$ python token_cache.py
+Testing token cache...
+No cached token found. Will login fresh.
+Connected!
+  Auth mode: jwt-cached
+Query result (3 rows):
+  Columns: ['id', 'name', 'amount']
+Token saved to: token_cache.json
+
+$ python token_cache.py  # second run
+Found cached token:
+  Host:    datateam-free-cluster.trino.galaxy.starburst.io
+  Expires: Wed Apr 15 07:08:16 2026
+```
+
+### 5. Frontend (`index.html`)
+
+Single-page application, 800+ lines, self-contained with CDN dependencies:
+
+| Dependency | CDN | Purpose |
+|-----------|-----|---------|
+| Tailwind CSS | cdn.tailwindcss.com | Styling |
+| Chart.js | cdn.jsdelivr.net/npm/chart.js | Visualizations |
+| SheetJS | cdn.sheetjs.com | Excel export |
+| html2canvas | cdnjs.cloudflare.com | PDF/JPEG export |
+| jsPDF | cdnjs.cloudflare.com | PDF generation |
+| Google Fonts (Inter) | fonts.googleapis.com | Typography |
+
+#### UI Components
+
+- **Left Sidebar (280px, collapsible):** Schema browser tree (catalog → schema → tables), conversation history, dark/light toggle, schema refresh button
+- **Center Panel:** Chat interface with user/bot messages, SQL code blocks with syntax highlighting, data tables, Chart.js visualizations, export toolbar
+- **Right Panel (320px, collapsible):** Chart type selector (bar/pie/line/area), axis column dropdowns, color theme picker
+
+#### Chart Features
+
+- Per-bar/per-slice colors for single-dataset charts
+- Chart title derived from column names (`count by name`, `name vs id, amount`)
+- Axis labels from column names
+- Tooltips with percentages for pie charts
+- Legend with circle dot style, responsive positioning
+- Theme-aware colors (dark/light mode)
+- Rounded bar corners (`borderRadius: 6`)
+
+#### Export Features
+
+| Format | Method | Library |
+|--------|--------|---------|
+| CSV | Backend `/api/export/csv` | Python `csv` module |
+| Excel | Backend `/api/export/xlsx` | `openpyxl` |
+| HTML | Backend `/api/export/html` | Styled HTML table |
+| PDF | Frontend capture | `html2canvas` + `jsPDF` |
+| JPEG | Frontend capture | `html2canvas` (captures full message bubble) |
+
+#### Smart Suggestion Chips
+
+After every bot response, contextual follow-up queries appear:
+
+- After `SHOW TABLES` → `DESCRIBE catalog.schema.table`, `SELECT * FROM catalog.schema.table LIMIT 100`
+- After `SELECT *` → `SELECT COUNT(*)`, `DESCRIBE`, `GROUP BY`, `SUM/AVG` on numeric columns
+- After `COUNT/SUM/AVG` → `SELECT *`, `DESCRIBE`, `Show all tables`
+
+All suggestions use fully qualified table names (`mcp2ohio.test_writes.demo`).
+
+### 6. Cluster Keepalive (`keepalive.py`)
+
+```python
+# Pings: SELECT 1 AS result (every 60 seconds)
+# Logs:  keepalive.log with timestamp
+# Trim:  Every 5 minutes, keeps only last 10 log entries
+# Auth:  Uses original StarburstClient (OAuth with cached token)
+```
+
+---
+
+## Execution Logs
+
+### Latency Benchmarks
+
+| Step | Latency | Notes |
+|------|---------|-------|
+| Python import + client init | 295ms | One-time startup cost |
+| OAuth handshake (first connect) | 4,822ms | Headless, no browser |
+| Single query (SHOW TABLES) | 3,275ms | Network round-trip (India→US) |
+| Single query (SELECT * demo) | 3,237ms | Consistent ~3.3s |
+| Schema fetch — sequential | 37,000ms | 3 schemas, 14 tables |
+| Schema fetch — parallel | 16,000ms | ThreadPoolExecutor |
+| Schema fetch — cached | 0ms | In-memory, 5-min TTL |
+
+### MCP Server Test (stdio JSON-RPC)
+
+```bash
+$ python -c "
+import json, subprocess, sys
+init = json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{...}})
+call = json.dumps({'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'execute_query','arguments':{'query':'SELECT * FROM mcp2ohio.test_writes.demo LIMIT 10'}}})
+proc = subprocess.run([sys.executable, 'server.py'], input=init+'\n'+call, capture_output=True, text=True)
+"
+# Output: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"3 row(s) returned.\n\nid | name  | amount\n---+-------+-------\n2  | test2 | 200.0\n3  | test3 | 300.0\n1  | hello | 150.0"}]}}
+```
+
+---
+
+## Errors & Resolutions
+
+| Error | Root Cause | Resolution |
+|-------|-----------|------------|
+| `"metric" is not a registered controller` | Chart.js has no "metric" chart type | Skip chart rendering for `metric`/`table` suggestions |
+| `Table 'mcp2ohio.test_writes.all' does not exist` | "show all tables" matched `show (\w+)` → captured "all" as table name | Added "show all tables" to exact match list before regex patterns |
+| `DESCRIBE mcp2ohio.test_writes.mcp2ohio` | Raw SQL `DESCRIBE mcp2ohio.x.y` matched NL `describe` pattern | Move raw SQL check (with dots) before NL regex patterns |
+| `SHOW all tables` syntax error | "Show all tables" treated as raw SQL after `SHOW` matched `_SQL_START` | Exact NL matches checked before raw SQL passthrough |
+| Table rows blank in UI | `r["Table"]` used on array rows (should be `r[0]`) | Changed to index-based access `r[i]` |
+| Pie chart all same color | `backgroundColor` was single color, not array | Per-slice color array for pie/doughnut/single-dataset bar |
+| JPEG export blank image | Captured empty chart canvas area | Capture full message bubble `document.getElementById(msgId)` |
+| Schema fetch blocks async event loop | Synchronous Starburst queries in `async def startup()` | Background thread via `threading.Thread(daemon=True)` |
+| Schema fetch timeout (37s) | Sequential N+1 queries | Parallel `ThreadPoolExecutor` (37s → 16s) |
+| Cross-schema table not found | NL translator hardcodes `test_writes` schema | `_try_other_schemas()` searches cached schema data |
+
+---
+
+## Alternatives Considered
+
+| Decision | Chosen | Alternative | Rationale |
+|----------|--------|-------------|-----------|
+| NL→SQL engine | Regex patterns | LLM-powered (Claude API) | Regex is fast, free, deterministic; LLM needed for JOINs/subqueries |
+| Auth | Monkey-patch webbrowser.open | client_credentials grant | Galaxy doesn't support client_credentials (405); BasicAuth works but user required JWT flow |
+| Frontend | Single HTML file (CDN deps) | React/Next.js SPA | Single file is portable, no build step, easy to serve from FastAPI |
+| Chart library | Chart.js (CDN) | D3.js, Plotly | Chart.js is lightweight, well-documented, sufficient for bar/pie/line |
+| Schema cache | In-memory dict + TTL | Redis, localStorage | Simple, no external dependencies, sufficient for single-server |
+| Export | Backend CSV/XLSX + Frontend PDF/JPEG | All backend or all frontend | Split gives best UX: backend for data formats, frontend for visual capture |
+
+---
+
+## Performance Notes
+
+- **Network latency is the bottleneck** — ~3.3s per query (India → US East Ohio). Cannot be reduced without deploying closer to Starburst cluster.
+- **Parallel schema fetch** reduces wall-clock time by 57% (37s → 16s) but increases concurrent connections to Starburst.
+- **Schema cache (5-min TTL)** eliminates repeat schema queries. Manual refresh via `?refresh=1`.
+- **Keepalive (60s interval)** prevents free cluster auto-suspend (5-min idle threshold). Uses lightweight `SELECT 1` query.
+- **Log rotation** keeps `keepalive.log` at max 10 entries — no disk growth.
+
+---
+
+## Security Considerations
+
+- `.env` file contains credentials — never committed to git (in `.gitignore`)
+- `token_cache.json` contains token metadata (no raw token) — excluded from git
+- CORS enabled for all origins (`allow_origins=["*"]`) — development only, restrict in production
+- SQL injection mitigated by `validate_identifier()` for NL-generated queries; raw SQL passthrough trusts user input
+- Aggregate alias regex only applies to known functions (`COUNT/SUM/AVG/MIN/MAX`) — no arbitrary SQL injection vector
+- Galaxy login credentials transmitted over HTTPS to `datateam.galaxy.starburst.io`
+
+---
+
+## Dummy Data Tables Created
+
+| Table | Rows | Columns | Best Chart Queries |
+|-------|------|---------|-------------------|
+| `sales_by_region` | 20 | region, quarter, revenue, units_sold, profit | `SELECT region, SUM(revenue) ... GROUP BY region` |
+| `employees` | 20 | name, department, role, salary, performance_score, years_experience, city | `SELECT department, AVG(salary) ... GROUP BY department` |
+| `web_analytics` | 15 | page, month, visitors, bounce_rate, avg_session_minutes, conversions | `SELECT page, SUM(visitors) ... GROUP BY page` |
+| `products` | 15 | product_name, category, price, stock, rating, reviews | `SELECT category, AVG(rating) ... GROUP BY category` |
+
+---
+
+## Git History (v2)
+
+| Commit | Message |
+|--------|---------|
+| `118c342` | `feat: StarQuery AI chatbot — NL-to-SQL web UI with charts and exports` |
+
+---
+
+## Conclusion (v2)
+
+This session built StarQuery AI — a production-quality chatbot web interface for querying Starburst Galaxy via natural language. The system features headless JWT authentication (zero browser interaction), parallel schema fetching, Chart.js visualizations with smart chart suggestions, multi-format data exports, and a cluster keepalive mechanism. The NL→SQL translator supports dynamic catalog/schema context parsing, cross-schema table resolution, and aggregate column aliasing. All code is deployed on branch `dev3` with timestamped backups for rollback capability.

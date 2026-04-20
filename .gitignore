@@ -1,0 +1,7 @@
+.playwright-mcp/
+starburst-mcp2-session.md
+brutally-honest-advisor.txt
+*.log
+__pycache__/
+*.pyc
+.env

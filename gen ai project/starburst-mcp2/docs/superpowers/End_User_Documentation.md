@@ -173,3 +173,223 @@ After today's session, the `demo` table has:
 - **Branch:** `dev1`
 - **Repository:** `selvar2/starburst-demo`
 - **Date:** April 8, 2026
+
+---
+---
+
+# Version 2: StarQuery AI — Your Data Chatbot
+## What We Built — April 14-15, 2026
+### A plain-English guide to the new chatbot interface
+
+---
+
+## What This Does
+
+We built a **chat window** where you can ask questions about your data in plain English. Think of it like texting a really smart assistant who knows everything about your database.
+
+You type something like:
+- "Show all tables"
+- "How many rows are in the demo table?"
+- "Show me sales by region"
+
+And it:
+- Finds the data for you
+- Shows it in a nice table
+- Draws a chart (bar, pie, line)
+- Lets you download the results (Excel, PDF, CSV, etc.)
+
+---
+
+## What You Need
+
+- A web browser (Chrome, Firefox, Edge — any will work)
+- The server must be running (someone starts it for you, or you run one command)
+- Your Starburst Galaxy account credentials (already saved in a settings file)
+
+---
+
+## Step-by-Step: How to Use StarQuery AI
+
+### 1. Open the App
+
+Open your browser and go to:
+```
+http://localhost:8000
+```
+
+You will see a dark-themed chat screen with "Welcome to StarQuery AI" in the middle.
+
+### 2. Look at the Left Sidebar
+
+On the left side, you'll see a **Schema Browser**. This shows all your databases and tables — like a folder tree:
+
+```
+mcp2ohio
+  ├── information_schema
+  ├── system
+  └── test_writes
+      ├── demo
+      ├── employees
+      ├── products
+      ├── sales_by_region
+      └── web_analytics
+```
+
+You can **click any table name** to automatically load its data.
+
+There's also a **refresh button (↻)** next to "Schema Browser" — click it if you think the list is outdated.
+
+### 3. Ask a Question
+
+Type your question in the text box at the bottom. Here are things you can ask:
+
+**Simple questions (plain English):**
+- `show all tables`
+- `describe demo`
+- `show all data from demo`
+- `count rows in demo`
+
+**Questions about specific databases:**
+- `show all data from roles, roles is part of information_schema schema and part of mcp2ohio catalog`
+
+**Direct SQL (if you know SQL):**
+- `SELECT region, SUM(revenue) FROM mcp2ohio.test_writes.sales_by_region GROUP BY region`
+
+Press **Enter** to send. The app will show you:
+1. The SQL it wrote for you
+2. A table with the results
+3. A chart (if the data is suitable)
+4. Download buttons
+
+### 4. Read the Results
+
+Each response from the AI shows:
+
+- **SQL Query** — click to expand and see the actual database query
+- **Row count** — a green badge showing how many rows came back
+- **Data table** — your results in a clean table format
+- **Chart** — a bar chart, pie chart, or line chart drawn automatically
+- **Download buttons** — CSV, Excel, HTML, PDF, JPEG
+
+### 5. Use the Suggestion Chips
+
+After every answer, you'll see **clickable buttons** at the bottom with follow-up questions. For example, after showing all tables, you might see:
+
+- "DESCRIBE mcp2ohio.test_writes.demo"
+- "SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100"
+
+**Just click one** — no need to type anything!
+
+### 6. Download Your Results
+
+Below every table, you'll see five buttons:
+
+| Button | What You Get |
+|--------|-------------|
+| **CSV** | A spreadsheet file you can open in Excel |
+| **Excel** | An Excel file (.xlsx) |
+| **HTML** | A web page with your table |
+| **PDF** | A PDF document with the table and chart |
+| **JPEG** | A picture of the results |
+
+Click any button and the file will download automatically.
+
+### 7. Change the Chart
+
+On the right side (click the chart icon ↗ at the top right if hidden), you can:
+
+- Pick a chart type: **Bar**, **Pie**, **Line**, or **Area**
+- Choose which columns go on each axis
+- Pick a color theme
+- Click **Generate Chart** to redraw
+
+### 8. Switch Between Dark and Light Mode
+
+At the bottom left, there's a **Dark/Light toggle**. Click it to switch the look.
+
+---
+
+## What You Should See
+
+### When You First Open the App:
+- A welcome screen with four clickable buttons
+- The sidebar showing your databases and tables
+- A text box saying "Ask about your data..."
+
+### After You Ask a Question:
+- Your question appears on the right (purple bubble)
+- The answer appears on the left with a table and chart
+- Suggestion buttons appear below the answer
+
+### Sample Results:
+
+**Query:** `SELECT region, SUM(revenue) FROM mcp2ohio.test_writes.sales_by_region GROUP BY region`
+
+**You see:**
+- A table with 5 regions and their total revenue
+- A bar chart with colored bars for each region
+- Download buttons below the table
+
+---
+
+## If Something Goes Wrong
+
+### "Loading schema..." stays forever
+- The database might be waking up (it sleeps after 5 minutes of no use)
+- Wait 30 seconds and refresh the page
+- Click the refresh button (↻) next to Schema Browser
+
+### Red error message appears
+- Read the error — it usually tells you what's wrong
+- Common: "Table does not exist" — check the table name spelling
+- Try clicking a table from the sidebar instead of typing
+
+### The page won't load at all
+- Make sure the server is running
+- Ask someone to start it with: `python -m uvicorn app_jwt:app --port 8000`
+
+### Chart looks wrong or doesn't appear
+- Not all data can make charts — you need at least one text column and one number column
+- Try a GROUP BY query for better charts
+
+### Download doesn't work
+- PDF and JPEG are captured from the screen — wait for the chart to fully load first
+- CSV and Excel always work
+
+---
+
+## New Tables You Can Explore
+
+We added four tables with sample data so you can try different charts:
+
+| Table | What's Inside | Try This |
+|-------|-------------|----------|
+| **sales_by_region** | Sales data for 5 regions, 4 quarters | "SELECT region, SUM(revenue) FROM mcp2ohio.test_writes.sales_by_region GROUP BY region" |
+| **employees** | 20 employees with salary and department | "SELECT department, AVG(salary) FROM mcp2ohio.test_writes.employees GROUP BY department" |
+| **web_analytics** | Website visitor data by page and month | "SELECT page, SUM(visitors) FROM mcp2ohio.test_writes.web_analytics GROUP BY page" |
+| **products** | 15 tech products with prices and ratings | "SELECT category, AVG(rating) FROM mcp2ohio.test_writes.products GROUP BY category" |
+
+---
+
+## No More Browser Popups!
+
+In version 1, a login window popped up in your browser every time. That's gone now. The app logs in automatically behind the scenes. You just open the page and start asking questions.
+
+---
+
+## Simple Summary
+
+- **Open** `http://localhost:8000` in your browser
+- **Type** a question or **click** a table in the sidebar
+- **See** your results as a table and chart
+- **Download** as Excel, CSV, PDF, or picture
+- **Click suggestion chips** for quick follow-up queries
+- **No login popups** — everything works automatically
+
+---
+
+## Changes Saved To
+
+- **Branch:** `dev3`
+- **Repository:** `selvar2/starburst-demo`
+- **Date:** April 14-15, 2026

@@ -10,3 +10,6 @@ build/
 .claude/
 starburst-mcp2-session.md
 .oauth_token_cache.json
+token_cache.json
+*.log
+backups/

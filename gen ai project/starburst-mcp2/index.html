@@ -503,10 +503,12 @@ function appendBotMsg(data,msgId){
 
   el.insertAdjacentHTML('beforeend',html);
 
-  // Render chart
+  // Render chart (skip for metric/table — no chart needed)
   if(data.columns&&data.rows&&data.rows.length>0){
     const chartType=data.chart_suggestion||'bar';
-    setTimeout(()=>renderChart(msgId,data.columns,data.rows,chartType),100);
+    if(chartType!=='metric'&&chartType!=='table'){
+      setTimeout(()=>renderChart(msgId,data.columns,data.rows,chartType),100);
+    }
   }
 }
 
