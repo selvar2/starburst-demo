@@ -1,0 +1,91 @@
+Prompts for StarQuery AI
+#	Prompt
+1	SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100
+2	SELECT COUNT(*) FROM mcp2ohio.test_writes.demo
+3	DESCRIBE mcp2ohio.test_writes.demo
+4	SHOW TABLES FROM mcp2ohio.test_writes
+5	SHOW SCHEMAS FROM mcp2ohio
+6	SELECT name, COUNT(*) FROM mcp2ohio.test_writes.demo GROUP BY name
+7	SELECT name, SUM(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+8	SELECT name, AVG(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+9	SELECT name, MIN(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+10	SELECT name, MAX(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+11	SELECT amount, COUNT(*) FROM mcp2ohio.test_writes.demo GROUP BY amount
+12	SELECT id, COUNT(*) FROM mcp2ohio.test_writes.demo GROUP BY id
+13	SELECT * FROM mcp2ohio.test_writes.demo ORDER BY amount DESC
+14	SELECT * FROM mcp2ohio.test_writes.demo ORDER BY amount ASC
+15	SELECT * FROM mcp2ohio.test_writes.demo WHERE amount > 200
+16	SELECT * FROM mcp2ohio.test_writes.demo WHERE name = 'hello'
+17	SELECT SUM(amount) FROM mcp2ohio.test_writes.demo
+18	SELECT AVG(amount) FROM mcp2ohio.test_writes.demo
+19	SELECT MIN(amount), MAX(amount) FROM mcp2ohio.test_writes.demo
+20	SELECT DISTINCT name FROM mcp2ohio.test_writes.demo
+21	SELECT * FROM mcp2ohio.system.iceberg_tables
+22	SELECT * FROM mcp2ohio.information_schema.tables
+23	SELECT * FROM mcp2ohio.information_schema.columns WHERE table_name = 'demo'
+24	SELECT * FROM mcp2ohio.information_schema.schemata
+25	SELECT name, amount FROM mcp2ohio.test_writes.demo WHERE amount BETWEEN 100 AND 250
+All prompts use the format: catalog.schema.table → mcp2ohio.test_writes.demo
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Natural Language Prompts for StarQuery AI
+#	Prompt
+1	show all tables from test_writes schema in mcp2ohio catalog
+2	show all schemas in mcp2ohio catalog
+3	describe demo table in test_writes schema, mcp2ohio catalog
+4	show all data from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+5	count rows in demo, demo is part of test_writes schema and part of mcp2ohio catalog
+6	top 5 amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+7	sum of amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+8	avg of amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+9	min of amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+10	max of amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+11	group by name from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+12	group by amount from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+13	group by id from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+14	show all data from iceberg_tables, iceberg_tables is part of system schema and part of mcp2ohio catalog
+15	show all data from tables, tables is part of information_schema schema and part of mcp2ohio catalog
+16	show all data from columns, columns is part of information_schema schema and part of mcp2ohio catalog
+17	show all data from schemata, schemata is part of information_schema schema and part of mcp2ohio catalog
+18	show all data from roles, roles is part of information_schema schema and part of mcp2ohio catalog
+Note: These prompts won't work with the current NL→SQL translator — it doesn't parse the is part of X schema and part of Y catalog pattern yet. Want me to add support for this pattern in the backend so these prompts actually work?
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100
+SELECT name, COUNT(*) FROM mcp2ohio.test_writes.demo GROUP BY name
+SELECT name, SUM(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+SELECT name, AVG(amount) FROM mcp2ohio.test_writes.demo GROUP BY name
+SELECT * FROM mcp2ohio.system.iceberg_tables
+SELECT * FROM mcp2ohio.information_schema.tables
+DESCRIBE mcp2ohio.test_writes.demo
+SHOW TABLES FROM mcp2ohio.test_writes
+SHOW SCHEMAS FROM mcp2ohio
+SELECT id, name, amount FROM mcp2ohio.test_writes.demo ORDER BY amount DESC
+SELECT COUNT(*) FROM mcp2ohio.test_writes.demo WHERE amount > 200
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+show all tables from test_writes schema in mcp2ohio catalog
+show all data from iceberg_tables, iceberg_tables is part of system schema and part of mcp2ohio catalog
+group by name from demo, demo is part of test_writes schema and part of mcp2ohio catalog
+describe roles, roles is part of information_schema schema and part of mcp2ohio catalog
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+show all tables
+show tables
+show schemas
+describe demo
+show all data from demo
+count rows in demo
+top 5 amount from demo
+sum of amount from demo
+avg of amount from demo
+min of amount from demo
+max of amount from demo
+group by name from demo
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
