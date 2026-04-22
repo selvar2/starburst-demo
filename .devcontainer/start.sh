@@ -102,6 +102,16 @@ if [ -n "$PYTHON" ] && [ -f "$PROJECT_DIR/server.py" ]; then
     fi
 fi
 
+# ── 7. Launch keepalive in background ────────────
+if [ -n "$PYTHON" ] && [ -f "$PROJECT_DIR/keepalive.py" ]; then
+    if pgrep -f "keepalive.py" >/dev/null 2>&1; then
+        echo "[OK] keepalive.py already running (PID $(pgrep -f keepalive.py))"
+    else
+        nohup $PYTHON "$PROJECT_DIR/keepalive.py" >> "$PROJECT_DIR/keepalive.log" 2>&1 &
+        echo "[OK] keepalive.py started in background (PID $!)"
+    fi
+fi
+
 # ── Summary ─────────────────────────────────────
 echo "============================================"
 if [ $ERRORS -eq 0 ]; then
