@@ -1,0 +1,1 @@
+../../../claude-marketplace/plugins/sys-prompt-generator/skills/system-prompt-generator/SKILL.md

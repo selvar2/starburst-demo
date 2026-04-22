@@ -1,0 +1,1 @@
+../../claude-marketplace/plugins/sys-prompt-generator/commands/generate-system-prompt.md

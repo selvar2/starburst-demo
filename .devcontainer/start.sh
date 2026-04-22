@@ -102,7 +102,10 @@ if [ -n "$PYTHON" ] && [ -f "$PROJECT_DIR/server.py" ]; then
     fi
 fi
 
-# ── 7. Launch keepalive in background ────────────
+# ── 7. Sync Claude marketplace plugins ───────────
+bash "$(dirname "$0")/sync-marketplace.sh"
+
+# ── 8. Launch keepalive in background ────────────
 if [ -n "$PYTHON" ] && [ -f "$PROJECT_DIR/keepalive.py" ]; then
     if pgrep -f "keepalive.py" >/dev/null 2>&1; then
         echo "[OK] keepalive.py already running (PID $(pgrep -f keepalive.py))"

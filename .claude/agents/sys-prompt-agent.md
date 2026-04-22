@@ -1,0 +1,1 @@
+../../claude-marketplace/plugins/sys-prompt-generator/agents/sys-prompt-agent.md
