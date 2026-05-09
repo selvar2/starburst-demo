@@ -10,7 +10,7 @@ Register in ~/.claude/settings.json:
     "starburst-rw": {
         "type": "stdio",
         "command": "python",
-        "args": ["c:/Users/Lenovo/gen ai project/starburst-mcp2/server.py"]
+        "args": ["c:/Users/Lenovo/gen-ai-project/starburst-mcp2/server.py"]
     }
 """
 

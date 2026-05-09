@@ -1,3 +1,20 @@
+# ============================================================================
+# BACKUP: app_jwt.py
+# Timestamp:  2026-05-09T15:19:37Z (TS=20260509_204843)
+# Source:     gen-ai-project/starburst-mcp2/app_jwt.py
+# Branch:     dev3 @ commit db6bb19
+# Why:        Adding NL-driven DDL/DML support to /api/chat. Original file
+#             only handled SELECT/SHOW/DESCRIBE. Backing up before adding
+#             permission checks, FQ-name validation, destructive-op confirm
+#             guard, and INSERT/UPDATE/DELETE/TRUNCATE/DROP/CREATE-SCHEMA
+#             NL patterns.
+# Before:     ~/api/chat~ executes SQL via client.execute with no guardrails.
+# After:      Same endpoint validates fully-qualified target, checks
+#             permissions via PermissionManager, requires context.confirm
+#             for destructive ops.
+# Restore:    cp 'gen-ai-project/starburst-mcp2/backup/app_jwt.20260509_204843.bak.py' gen-ai-project/starburst-mcp2/app_jwt.py
+# ============================================================================
+
 # Additional dependencies: fastapi, uvicorn[standard], openpyxl, python-multipart
 
 import io

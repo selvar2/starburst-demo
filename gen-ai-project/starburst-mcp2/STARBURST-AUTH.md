@@ -93,13 +93,13 @@ Expired:   Logs in again, saves new token.
 
 ### Test original client (will open browser):
 ```bash
-cd "gen ai project/starburst-mcp2"
+cd "gen-ai-project/starburst-mcp2"
 python -c "from starburst_client import StarburstClient; c = StarburstClient(); print(c.execute('SELECT 1'))"
 ```
 
 ### Test JWT client (no browser):
 ```bash
-cd "gen ai project/starburst-mcp2"
+cd "gen-ai-project/starburst-mcp2"
 python -c "from starburst_client_jwt import StarburstClientJWT; c = StarburstClientJWT(); print(c.execute('SELECT 1'))"
 ```
 
@@ -110,7 +110,7 @@ Expected output:
 
 ### Test token cache (no browser + saves to disk):
 ```bash
-cd "gen ai project/starburst-mcp2"
+cd "gen-ai-project/starburst-mcp2"
 python token_cache.py
 ```
 

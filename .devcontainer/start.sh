@@ -3,7 +3,7 @@
 # Validates environment, deps, .env, and server readiness.
 set -euo pipefail
 
-PROJECT_DIR="gen ai project/starburst-mcp2"
+PROJECT_DIR="gen-ai-project/starburst-mcp2"
 ERRORS=0
 
 echo "============================================"

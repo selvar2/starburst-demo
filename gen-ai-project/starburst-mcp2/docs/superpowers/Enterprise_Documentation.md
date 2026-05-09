@@ -62,10 +62,10 @@ This session addressed three critical engineering objectives for the Starburst G
 | `.devcontainer/devcontainer.json` | Created | Container lifecycle configuration |
 | `.devcontainer/setup.sh` | Created → Updated | Post-create: fresh dep install + validation |
 | `.devcontainer/start.sh` | Created → Updated | Post-start: env detection + health check |
-| `gen ai project/starburst-mcp2/.env` | Created | Starburst Galaxy credentials (gitignored) |
-| `gen ai project/starburst-mcp2/starburst_client.py` | Modified | BasicAuth + connection reuse |
-| `gen ai project/starburst-mcp2/.gitignore` | Modified | Added `.oauth_token_cache.json` |
-| `gen ai project/starburst-mcp2/requirements.txt` | Modified | Added `requests>=2.31.0` |
+| `gen-ai-project/starburst-mcp2/.env` | Created | Starburst Galaxy credentials (gitignored) |
+| `gen-ai-project/starburst-mcp2/starburst_client.py` | Modified | BasicAuth + connection reuse |
+| `gen-ai-project/starburst-mcp2/.gitignore` | Modified | Added `.oauth_token_cache.json` |
+| `gen-ai-project/starburst-mcp2/requirements.txt` | Modified | Added `requests>=2.31.0` |
 
 ---
 
@@ -91,7 +91,7 @@ This session addressed three critical engineering objectives for the Starburst G
   "mcpServers": {
     "starburst-rw": {
       "command": "python3",
-      "args": ["./gen ai project/starburst-mcp2/server.py"]
+      "args": ["./gen-ai-project/starburst-mcp2/server.py"]
     }
   }
 }
@@ -372,7 +372,7 @@ STARBURST_CLIENT_SECRET=GXY$your_secret_here
 ### File Structure
 
 ```
-gen ai project/starburst-mcp2/
+gen-ai-project/starburst-mcp2/
 ├── app.py                      # FastAPI server (original OAuth client)
 ├── app_jwt.py                  # FastAPI server (JWT headless auth)
 ├── index.html                  # StarQuery AI frontend (single-page app)

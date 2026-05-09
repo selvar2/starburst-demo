@@ -9,13 +9,13 @@
 ## What Was Built
 
 ### 1. Keepalive Process
-- **File:** `gen ai project/starburst-mcp2/keepalive.py`
+- **File:** `gen-ai-project/starburst-mcp2/keepalive.py`
 - Pings Starburst with `SELECT 1` every 60 seconds to prevent free-cluster idle suspension
 - Logs to `keepalive.log`, auto-trims to last 10 entries every 5 minutes
 - Launched via `nohup` on container start/create
 
 ### 2. Headless JWT OAuth Client
-- **File:** `gen ai project/starburst-mcp2/starburst_client_jwt.py`
+- **File:** `gen-ai-project/starburst-mcp2/starburst_client_jwt.py`
 - `StarburstClientJWT` class — drop-in replacement for `StarburstClient`
 - Completes OAuth flow without browser popup by monkey-patching `webbrowser.open`
 - Used for CI/headless environments where browser is unavailable
@@ -27,7 +27,7 @@
 - Schema pre-warmed in background thread on startup (5-min TTL cache)
 
 ### 4. Frontend Fix — Relative API URL
-- **File:** `gen ai project/starburst-mcp2/index.html` (line 275)
+- **File:** `gen-ai-project/starburst-mcp2/index.html` (line 275)
 - Changed `const API='http://localhost:8000'` → `const API=''`
 - Fixes "Failed to connect to server" error when accessed via public Codespaces port
 - Relative URL works from any hostname (localhost or public Codespaces URL)
@@ -134,16 +134,16 @@ bash .devcontainer/sync-marketplace.sh
 ### UI Fixes & Feature Additions
 
 #### Fix 1 — Table Column Header Overlap
-- **File:** `gen ai project/starburst-mcp2/index.html`
+- **File:** `gen-ai-project/starburst-mcp2/index.html`
 - **Root cause:** `.data-table th` had `position:sticky;top:0` but no `z-index`, causing headers to render behind `<td>` data rows on scroll. Semi-transparent background `rgba(0,0,0,.15)` let row content bleed through.
 - **Fix:** Added `z-index:2` to sticky `<th>`, changed background to `var(--surface3)` (solid color for both dark and light themes).
 
 #### Fix 2 — App Renamed to "Data Analytics AI"
-- **File:** `gen ai project/starburst-mcp2/index.html`
+- **File:** `gen-ai-project/starburst-mcp2/index.html`
 - Changed `<title>`, sidebar logo text, and welcome screen heading from "StarQuery AI" → "Data Analytics AI" in three locations.
 
 #### Fix 3 — Enterprise-Grade PDF Export
-- **File:** `gen ai project/starburst-mcp2/index.html`
+- **File:** `gen-ai-project/starburst-mcp2/index.html`
 - **Old approach:** html2canvas screenshot of dark UI (non-standard, low contrast, captured UI chrome).
 - **New approach:** Full jsPDF programmatic drawing with:
   - Navy header bar (`#1a2348`) with white app name + timestamp
@@ -156,7 +156,7 @@ bash .devcontainer/sync-marketplace.sh
   - PDF saved as landscape A4
 
 #### Fix 4 — Suggestion Chips: Natural Language Labels with Hidden SQL
-- **File:** `gen ai project/starburst-mcp2/index.html`
+- **File:** `gen-ai-project/starburst-mcp2/index.html`
 - **Old behavior:** Chips displayed raw SQL strings (e.g., `SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100`).
 - **New behavior:** Chips show friendly NL labels (e.g., "📄 Show all data from demo") but execute the actual SQL silently.
 - **Implementation:**

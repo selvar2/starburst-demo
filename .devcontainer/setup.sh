@@ -3,7 +3,7 @@
 # Always does a FRESH install — no caching, no skipping.
 set -euo pipefail
 
-PROJECT_DIR="gen ai project/starburst-mcp2"
+PROJECT_DIR="gen-ai-project/starburst-mcp2"
 
 echo "============================================"
 echo "  Starburst MCP: postCreateCommand (setup)"
