@@ -8,514 +8,331 @@ type: project
 
 ## PROJECT OVERVIEW
 
-- **Goal:** (To be defined when project starts)
-- **Description:** Starburst MCP2 project
-- **Tech Stack:** (To be defined)
-- **Repository:** `c:\Users\Lenovo\gen ai project\starburst-mcp2`
+- **Goal:** Build a full AI-powered Starburst Galaxy query interface with NL→SQL, charts, exports
+- **Description:** StarQuery — web chatbot that translates natural language to SQL, runs against Starburst Galaxy, and returns charts/tables/exports
+- **Tech Stack:** Python, FastAPI, Uvicorn, Trino DBAPI2, OAuth2 (headless JWT), Vanilla JS, Chart.js
+- **Repository:** `selvar2/starburst-demo` → branch `dev3`
+- **Codespaces path:** `/workspaces/starburst-demo`
+- **Project folder:** `gen ai project/starburst-mcp2/`
+
+---
 
 ## CURRENT STATE
 
-- **What is completed:**
-  - Project scaffolding (CLAUDE.md + session memory)
-  - First query via Python trino client (10 rows from burstbank.account)
-  - Audited starburst-mcp project (Phase 1 Python client)
-  - Found starburst/ reference folder with full MCP setup guide + OAuth config
-  - Registered Starburst native MCP server in Claude Code settings.json
-- **What is in progress:** Restart Claude Code to load starburst-galaxy MCP server
-- **Known issues:**
-  - OAuth redirect URI (https://claude.ai/api/mcp/auth_callback) was set for Claude Desktop — may not work with Claude Code
-  - Free-cluster cold start takes 20-60s
+### Completed
+- Starburst Galaxy connection via Python trino client (BasicAuth + OAuth2)
+- `StarburstClient` — original client with browser OAuth
+- `StarburstClientJWT` — headless OAuth client (no browser popup, works in CI/Codespaces)
+- `keepalive.py` — background ping every 60s to prevent free-cluster idle suspension
+- `app_jwt.py` — FastAPI chatbot server on port 8000, headless JWT auth
+- `app.py` — FastAPI server on port 8001, browser OAuth
+- `index.html` — frontend fixed: `const API=''` (relative URL, works on public Codespaces port)
+- `run_query_jwt.py` — headless JWT query runner (validated working)
+- MCP server (`server.py`) registered in Claude Code settings
+- `.github/agents/` folder committed to dev3
+- Claude marketplace plugin auto-sync system (`.devcontainer/sync-marketplace.sh`)
+- `setup.sh` + `start.sh` updated: auto-run sync + launch keepalive on container start
+- `.claude/commands/generate-system-prompt.md` — real file copy (not symlink), visible in Claude Code `/` menu
+- `.claude/agents/sys-prompt-agent.md` — real file copy
+- `.claude/skills/system-prompt-generator/SKILL.md` — real file copy
+- `compact_session_summary.md` — full session documentation at repo root
+- 2026-05-09: `app_jwt.py` verified running on port 8000 from the repo virtualenv; `GET /`, `GET /api/schema`, and `POST /api/query` all succeeded
+
+### In Progress
+- Nothing currently in progress
+
+### Known Issues / Notes
+- Free-cluster cold start: 20-60 seconds
+- `app_jwt.py` must be started manually after container restart (not auto-started by devcontainer)
+- OAuth tokens cached in `token_cache.json` — headless flow re-uses cached token if valid
+- Claude Code slash commands require **real files** (not symlinks) in `.claude/commands/` — sync script updated to use `cp` not `ln -sf`
+- Fresh environments that only install `requirements.txt` will miss StarQuery web UI packages (`fastapi`, `uvicorn[standard]`, `openpyxl`, `python-multipart`) until they are installed separately
 
 ---
 
 ## SESSION LOGS
 
+### [2026-04-22 Fix — Table Column Header Overlap]
+
+#### ACTION TYPE: CODE
+#### PURPOSE: Fix overlapping column names in data table UI
+#### PRE-EXECUTION
+- `.data-table th` had `position:sticky;top:0` but no `z-index`, causing header cells to render behind `<td>` rows when scrolling
+- Background was `rgba(0,0,0,.15)` (semi-transparent) — content bled through on scroll
+
+#### EXECUTION RESULT
+Changed in `index.html`:
+- `.data-table th` background → `var(--surface3)` (solid color for both dark and light themes)
+- Added `z-index:2` to sticky header so it stays above data rows
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Classic sticky-header z-index bug. Fix works for any number of columns and any row count.
+#### NEXT STEP: None — fix complete.
+
 ### [2026-04-08 Session Start]
 
 #### ACTION TYPE: CONFIG
+#### PURPOSE: Set up persistent development memory system
 
-#### PURPOSE:
-
-Set up persistent development memory system for the project. Created CLAUDE.md (auto-read by Claude Code) and this session memory file to ensure zero context loss across sessions.
-
-#### PRE-EXECUTION
-
-Created two files:
-1. `CLAUDE.md` — Project root instructions with development protocol, logging rules, and recovery steps
-2. `starburst-mcp2-session.md` — This file, persistent session memory
-
-#### EXECUTION RESULT
-
-Both files created successfully.
+Created `CLAUDE.md` and `starburst-mcp2-session.md`. Both files created successfully. Project was greenfield.
 
 #### STATUS: SUCCESS
-
-#### OBSERVATIONS:
-
-- Project directory was completely empty (greenfield)
-- CLAUDE.md is auto-loaded by Claude Code at conversation start
-- Session memory file is indexed in MEMORY.md for cross-session persistence
-
-#### NEXT STEP:
-
-Define project goal, tech stack, and begin first development task as directed by user.
+#### NEXT STEP: Begin development tasks.
 
 ---
 
-### [2026-04-08 Task 1 — Starburst MCP Query]
-
-#### ACTION TYPE: CODE / CLI
-
-#### PURPOSE:
-
-User wants to query Starburst Galaxy database using MCP. Target: `SELECT * FROM "sample"."burstbank"."account" LIMIT 10;`
-Cluster: `datateam.galaxy.starburst.io` (free-cluster). Catalog: `sample`, Schema: `burstbank`, Table: `account`.
-Columns observed: custkey, acctkey, products, cc_number, cc_open_date, cc_closed_date (all varchar).
-
-#### PRE-EXECUTION
-
-Step 1: Check if Starburst MCP tools are available in current session → NOT FOUND (no starburst MCP in tool list)
-Step 2: Found existing `starburst-mcp` project at `c:\Users\Lenovo\gen ai project\starburst-mcp\` with:
-  - `starburst_client.py` — Python client
-  - `run_query.py` — Query runner
-  - `.env` — Connection credentials
-  - `queries/burstbank_account.sql` — The exact SQL query needed
-Step 3: Read existing client files to understand connection setup, then execute query
-
-#### EXECUTION RESULT
-
-```
-MCP STATUS: NOT AVAILABLE (no Starburst MCP tools registered in Claude Code)
-CONNECTION METHOD: Python trino client via existing `starburst-mcp` project
-CONNECTION: SUCCESS (datateam-free-cluster.trino.galaxy.starburst.io:443)
-
-QUERY: SELECT * FROM "sample"."burstbank"."account" LIMIT 10
-
-RESULT: 10 rows returned successfully
-COLUMNS (21): custkey, acctkey, products, cc_number, cc_open_date, cc_closed_date,
-  cc_balance, cc_status, cc_default, mortgage_id, mortgage_open_date, mortgage_closed_date,
-  mortgage_balance, mortgage_status, mortgage_default, auto_loan_id, auto_loan_open_date,
-  auto_loan_closed_date, auto_loan_balance, auto_loan_status, auto_loan_default
-
-SAMPLE DATA:
-custkey | acctkey | products                       | cc_status | cc_balance
-1000001 | 1217470 | credit_card,auto_loan          | open      | 9209.9
-1000008 | 1217477 | credit_card,mortgage           | closed    | 0.0
-1000010 | 1217479 | credit_card,mortgage,auto_loan | open      | 9870.34
-```
-
-#### STATUS: SUCCESS
-
-#### OBSERVATIONS:
-
-- Starburst MCP is NOT configured as an MCP server in this Claude Code session
-- Used existing Python client (`starburst-mcp/run_query.py`) to query Starburst Galaxy
-- Connection details: host=`datateam-free-cluster.trino.galaxy.starburst.io`, port=443, catalog=`sample`, schema=`burstbank`
-- User credentials: `prakashrajr666@networth.awsapps.com/accountadmin` (password masked: `starbu****`)
-- Table has 21 columns covering credit cards, mortgages, and auto loans
-- All 10 rows returned — data includes open/closed accounts, defaults, balances
-- Column types appear to be mix of varchar, date, decimal, and boolean-like (Y/N)
-
-#### NEXT STEP:
-
-Awaiting user direction — options include: setting up Starburst as a proper MCP server, running more queries, or building the starburst-mcp2 project.
-
----
-
-### [2026-04-08 Task 2 — Audit starburst-mcp Project]
-
-#### ACTION TYPE: CODE
-
-#### PURPOSE:
-
-User asked to check what exists in the sibling `starburst-mcp` project before building `starburst-mcp2`.
-
-#### PRE-EXECUTION
-
-Read all files in `c:\Users\Lenovo\gen ai project\starburst-mcp\`:
-- `.env`, `.vscode/settings.json`, `starburst_client.py`, `run_query.py`
-- `queries/burstbank_account.sql`, `End_User_Documentation.md`, `Enterprise_Documentation.md`
-
-#### EXECUTION RESULT
-
-```
-starburst-mcp is a Python CLI client, NOT an MCP server.
-Enterprise doc explicitly states "MCP Server (planned)" as a future execution path.
-
-Files:
-- starburst_client.py — StarburstClient class (trino DBAPI2, BasicAuth, HTTPS, .env config)
-- run_query.py — CLI runner with table/JSON output, SQL file support, param overrides
-- .env — Connection: datateam-free-cluster.trino.galaxy.starburst.io:443
-- .vscode/settings.json — VS Code StarburstOne extension config
-- queries/ — SQL files + documentation (end user + enterprise)
-
-Available catalogs: galaxy, sample, starburst, system, tpcds, tpch
-Available tables in sample.burstbank: account, auto_loan_payment, credit_card_payment,
-  customer, customer_profile, employee, mortgage_payment, product_profile, state_census
-
-Key design: config priority CLI > ENV > .env, auto-strips semicolons, returns {columns, rows} dict
-```
-
-#### STATUS: SUCCESS
-
-#### OBSERVATIONS:
-
-- starburst-mcp is Phase 1 (Python client) — starburst-mcp2 should be Phase 2 (MCP server)
-- StarburstClient class is clean and reusable — can be wrapped into an MCP server
-- Potential MCP tools: execute_query, show_catalogs, show_schemas, show_tables, describe_table
-- Enterprise doc has full architecture diagram and detailed implementation notes
-
-#### NEXT STEP:
-
-Build starburst-mcp2 as a proper MCP server that wraps StarburstClient and registers in Claude Code settings.
-
----
-
-### [2026-04-08 Task 3 — Check MCP Availability for Starburst]
-
-#### ACTION TYPE: CONFIG
-
-#### PURPOSE:
-
-User reports Starburst MCP works in Claude Desktop but not here. Investigating where the Starburst MCP server is configured.
-
-#### PRE-EXECUTION
-
-Checked all MCP configuration locations:
-1. Claude Code `settings.json` → mcpServers section
-2. Claude Desktop `claude_desktop_config.json`
-3. Project `.mcp.json` files
-
-#### EXECUTION RESULT
-
-```
-Claude Code mcpServers (3 registered):
-  1. computer-use-mcp  → node server.js
-  2. strands-agents    → uvx strands-agents-mcp-server
-  3. shadcn            → npx shadcn@latest mcp
-
-Claude Desktop config:
-  - No mcpServers section found (only preferences)
-  - BUT user confirms Starburst MCP works in Claude Desktop
-
-Conclusion: Starburst MCP is NOT registered in Claude Code.
-User's Claude Desktop may have had it configured previously or uses a built-in Starburst integration.
-```
-
-#### STATUS: SUCCESS (investigation complete)
-
-#### OBSERVATIONS:
-
-- Claude Code has 3 MCP servers: computer-use-mcp, strands-agents, shadcn — NO starburst
-- Claude Desktop config at AppData/Roaming/Claude/ has no mcpServers section currently
-- User says Starburst MCP worked in Claude Desktop previously — may have been removed/reset
-- To use Starburst MCP in Claude Code, we need to either:
-  a) Build a Starburst MCP server (starburst-mcp2) and register it in settings.json
-  b) Find and re-register the existing Starburst MCP server config
-
-#### NEXT STEP:
-
-Build starburst-mcp2 as an MCP server and register it in Claude Code settings.json under mcpServers.
-
----
-
-### [2026-04-08 Task 4 — Starburst MCP Clarification]
-
-#### ACTION TYPE: DESIGN
-
-#### PURPOSE:
-
-User showed screenshot of Claude Desktop running Starburst queries via built-in integration. Clarifying why it doesn't work in Claude Code.
-
-#### PRE-EXECUTION
-
-Analyzed screenshot: Claude Desktop (claude.ai) shows "Used Starburst integration, loaded tools" — this is a native Anthropic-built integration, not a user-configured MCP server.
-
-#### EXECUTION RESULT
-
-```
-FINDING: Claude Desktop has a BUILT-IN Starburst integration (native, not MCP)
-- Shows as "Used Starburst integration, loaded tools" in Claude Desktop
-- This is NOT available in Claude Code (CLI/VS Code)
-- Claude Code only supports custom MCP servers configured in settings.json
-- To get equivalent functionality in Claude Code → build a custom Starburst MCP server
-```
-
-#### STATUS: SUCCESS (clarification complete)
-
-#### OBSERVATIONS:
-
-- Claude Desktop (claude.ai) has native integrations (Starburst, Google Drive, etc.) not available in Claude Code
-- The Starburst integration in Desktop connects directly — no user MCP config needed
-- Claude Code requires custom MCP servers registered in ~/.claude/settings.json
-- starburst-mcp2 project goal confirmed: build an MCP server to replicate Desktop's Starburst capability
-
-#### NEXT STEP:
-
-Build starburst-mcp2 as a Node.js or Python MCP server with tools: execute_query, show_catalogs, show_tables, describe_table. Register in Claude Code settings.json.
-
----
-
-### [2026-04-08 Task 5 — Reference Discovery in starburst/ Folder]
-
-#### ACTION TYPE: CODE
-
-#### PURPOSE:
-
-User pointed to `c:\Users\Lenovo\gen ai project\starburst\` for reference material on Starburst MCP setup.
-
-#### PRE-EXECUTION
-
-Read full README.md and directory structure of the starburst/ folder.
-
-#### EXECUTION RESULT
-
-```
-CRITICAL FINDING: Complete Starburst MCP setup guide exists in starburst/README.md
-
-KEY DISCOVERY — Starburst has a NATIVE MCP SERVER:
-  URL: https://datateam.mcp.galaxy.starburst.io
-  Type: HTTP (remote MCP server, NOT local)
-  Auth: OAuth2 (Private client required)
-
-OAuth Config (already created):
-  Client ID: claude_mcp@datateam.galaxy.starburst.io
-  Redirect URI: https://claude.ai/api/mcp/auth_callback
-  Type: Private (Claude needs Client ID + Secret)
-
-Claude Code config (from README):
-  {
-    "mcpServers": {
-      "starburst-galaxy": {
-        "type": "http",
-        "url": "https://datateam.mcp.galaxy.starburst.io"
-      }
-    }
-  }
-
-AI Functions Available (all tested, all PASS):
-  1. starburst.ai.prompt() — free-form AI queries
-  2. starburst.ai.analyze_sentiment() — sentiment scoring
-  3. starburst.ai.translate() — multi-language translation
-  4. starburst.ai.classify() — categorization
-  5. starburst.ai.fix_grammar() — text correction
-  6. starburst.ai.mask() — PII redaction
-
-Key Rules:
-  - Function prefix: starburst.ai.* (NOT ai.*)
-  - Positional params only (no => named params)
-  - Model alias: prakashrajr666 (maps to gpt-3.5-turbo)
-  - Free-cluster cold start: 20-60s
-  - Client ID: only lowercase, numbers, underscores (no hyphens)
-```
-
-#### STATUS: SUCCESS
-
-#### OBSERVATIONS:
-
-- Starburst Galaxy provides a NATIVE remote MCP server at https://datateam.mcp.galaxy.starburst.io
-- This is what Claude Desktop uses — it's NOT a custom-built MCP server, it's Starburst's own
-- OAuth client already created: claude_mcp@datateam.galaxy.starburst.io
-- README has exact Claude Code config snippet for .mcp.json
-- We do NOT need to build a custom MCP server — just register the native one in Claude Code
-- 6 AI SQL functions tested and documented with screenshots
-
-#### NEXT STEP:
-
-Register Starburst's native MCP server in Claude Code by adding to settings.json or .mcp.json:
-  type: "http", url: "https://datateam.mcp.galaxy.starburst.io"
-May need OAuth auth flow configuration for Claude Code (different from Claude Desktop).
-
----
-
-### [2026-04-08 Task 6 — Register Starburst MCP in Claude Code]
-
-#### ACTION TYPE: CONFIG
-
-#### PURPOSE:
-
-Register Starburst Galaxy's native MCP server in Claude Code settings using OAuth credentials.
-
-#### PRE-EXECUTION
-
-OAuth credentials received:
-- Client ID: claude_mcp@datateam.galaxy.starburst.io
-- Client Secret: GXY$****Q0Co (masked)
-- Redirect URI: https://claude.ai/api/mcp/auth_callback
-- MCP Server URL: https://datateam.mcp.galaxy.starburst.io
-
-Will add to ~/.claude/settings.json under mcpServers:
-```json
-"starburst-galaxy": {
-  "type": "http",
-  "url": "https://datateam.mcp.galaxy.starburst.io"
-}
-```
-
-#### EXECUTION RESULT
-
-```
-Added to ~/.claude/settings.json → mcpServers:
-  "starburst-galaxy": {
-    "type": "http",
-    "url": "https://datateam.mcp.galaxy.starburst.io"
-  }
-
-Verified: settings.json now has 4 MCP servers:
-  1. computer-use-mcp (local node)
-  2. strands-agents (uvx)
-  3. shadcn (npx)
-  4. starburst-galaxy (remote HTTP) ← NEW
-```
-
-#### STATUS: SUCCESS
-
-#### OBSERVATIONS:
-
-- Starburst MCP server registered as remote HTTP type in Claude Code settings
-- OAuth credentials: Client ID = claude_mcp@datateam.galaxy.starburst.io, Secret = masked
-- Redirect URI (https://claude.ai/api/mcp/auth_callback) was configured for Claude Desktop
-- Claude Code may need a DIFFERENT redirect URI for OAuth — need to test
-- Session restart required for Claude Code to pick up the new MCP server
-
-#### NEXT STEP:
-
-Restart Claude Code session to load the new MCP server. Test if OAuth flow works.
-If redirect URI fails, may need to create a new OAuth client with Claude Code's redirect URI.
-
----
-
-## KNOWN PATTERNS / DECISIONS
-
-- Development protocol: log-before-execute, mandatory chain of thought
-- All actions tracked with timestamps, pre/post execution, and status
-- Session memory is the single source of truth for project state
-
----
-
-## SECURITY NOTES
-
-- No secrets stored yet
-- All future API keys will be masked (e.g., `sk-****1234`)
-- `.env` files will never be committed
-
-### [2026-04-22 Git Push Action]
+### [2026-04-08 Task 1 — First Starburst Query]
 
 #### ACTION TYPE: CLI
-
-#### PURPOSE: Push local `dev3` branch commits to the remote `origin/dev3` branch
-
-#### PRE-EXECUTION
-
-Planned command:
+#### PURPOSE: Query sample.burstbank.account via Python trino client
 
 ```
-git push origin dev3
-```
-
-#### EXECUTION RESULT
-
-Command outputs (captured):
-
-```
-To https://github.com/selvar2/starburst-demo
- ! [rejected]        dev3 -> dev3 (fetch first)
-error: failed to push some refs to 'https://github.com/selvar2/starburst-demo'
-hint: Updates were rejected because the remote contains work that you do not
-hint: have locally. This is usually caused by another repository pushing to
-hint: the same ref. If you want to integrate the remote changes, use
-hint: 'git pull' before pushing again.
-hint: See the 'Note about fast-forwards' in 'git push --help' for details.
-
-Command exited with code 1
-```
-
-#### STATUS: FAILURE
-
-#### OBSERVATIONS:
-
-- Push was rejected because the remote `dev3` branch contains commits not present locally. A `git pull --rebase` or merging the remote changes is required before pushing.
-
-#### NEXT STEP:
-
-Run `git pull --rebase origin dev3` (or `git pull origin dev3`), resolve any conflicts, then retry `git push origin dev3`. Confirm before I proceed.
-
-### [2026-04-22 Git Commit Action]
-
-#### ACTION TYPE: CLI
-
-#### PURPOSE: Commit all current workspace changes to the `dev3` branch
-
-#### PRE-EXECUTION
-
-Planned commands:
-
-```
-git status --porcelain --branch
-git add -A
-git commit -m "Save workspace changes"
-```
-
-#### EXECUTION RESULT
-
-Command outputs (captured):
-
-```
-## dev3...origin/dev3
- M .devcontainer/setup.sh
- M .devcontainer/start.sh
- M starburst-mcp2-session.md
-[dev3 c316e5e] Save workspace changes
- Author: selvar2 <selvarajaa13@gmail.com>
- 3 files changed, 51 insertions(+)
+SELECT * FROM "sample"."burstbank"."account" LIMIT 10
+→ 10 rows, 21 columns (custkey, acctkey, products, cc_*, mortgage_*, auto_loan_*)
+Connection: datateam-free-cluster.trino.galaxy.starburst.io:443
 ```
 
 #### STATUS: SUCCESS
 
-#### OBSERVATIONS:
+---
 
-- `git status` showed three modified files. The changes were staged and committed.
-- Commit hash: `c316e5e` on branch `dev3` with message "Save workspace changes".
+### [2026-04-08 Tasks 2–6 — MCP Discovery + Registration]
 
-#### NEXT STEP:
+#### ACTION TYPE: CODE / CONFIG
+#### PURPOSE: Discover Starburst native MCP server, register in Claude Code
 
-Update any remote if the user requests a push; otherwise action complete.
+- Audited `starburst-mcp/` (Python CLI, not MCP server)
+- Found native Starburst MCP at `https://datateam.mcp.galaxy.starburst.io`
+- OAuth client created: `claude_mcp@datateam.galaxy.starburst.io`
+- Registered in `~/.claude/settings.json` as `starburst-galaxy` HTTP MCP server
+- AI SQL functions discovered: `starburst.ai.prompt()`, `analyze_sentiment()`, `translate()`, `classify()`, `fix_grammar()`, `mask()`
 
+#### STATUS: SUCCESS
 
 ---
 
-### [2026-04-22 Run run_query_jwt.py]
+### [2026-04-22 — Headless JWT OAuth Validation]
 
 #### ACTION TYPE: CLI
-
-#### PURPOSE: Run run_query_jwt.py to validate headless JWT/OAuth connection to Starburst Galaxy and query sample.burstbank.account LIMIT 1
-
-#### PRE-EXECUTION
+#### PURPOSE: Validate headless JWT OAuth flow works in Codespaces (no browser)
 
 ```bash
 cd "gen ai project/starburst-mcp2" && python3 run_query_jwt.py
 ```
 
-#### EXECUTION RESULT
-
 ```
 Connecting to datateam-free-cluster.trino.galaxy.starburst.io (catalog=mcp2ohio, auth=jwt)
-Galaxy portal: datateam.galaxy.starburst.io
-Email: prakashrajr666@networth.awsapps.com
 Executing: SELECT * FROM "sample"."burstbank"."account" LIMIT 1
 1 row(s) returned.
 custkey=1000001 | acctkey=1217470 | products=credit_card,auto_loan | cc_status=open | cc_balance=9209.9
 ```
 
 #### STATUS: SUCCESS
+#### OBSERVATIONS: Headless OAuth completed without manual browser click. JWT auth works in Codespaces.
 
-#### OBSERVATIONS:
-- Headless OAuth completed — no manual browser click needed
-- OAuth initiate URL was generated and handled programmatically
-- 1 row returned from sample.burstbank.account (21 columns)
-- JWT auth flow working in Codespaces environment
+---
 
-#### NEXT STEP: Awaiting user direction.
+### [2026-04-22 — app_jwt.py FastAPI Server Started]
+
+#### ACTION TYPE: CLI
+#### PURPOSE: Start StarQuery chatbot server on port 8000
+
+```bash
+nohup python3 -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000 > /tmp/app_jwt.log 2>&1 &
+```
+
+Server started. Schema pre-warm runs in background thread on startup (5-min TTL cache).
+
+Endpoints:
+- `GET /` — serves index.html (frontend)
+- `GET /api/schema` — returns cached schema
+- `POST /api/query` — runs raw SQL
+- `POST /api/chat` — NL→SQL translation + execution
+- `POST /api/export/{fmt}` — CSV/JSON/Excel export
+
+#### STATUS: SUCCESS
+
+---
+
+### [2026-04-22 — Fix "Failed to connect to server" on Public Codespaces Port]
+
+#### ACTION TYPE: CODE
+#### PURPOSE: Fix frontend error when accessing via public Codespaces URL (not localhost)
+
+**Root cause:** `gen ai project/starburst-mcp2/index.html` line 275 had:
+```js
+const API = 'http://localhost:8000';
+```
+This doesn't resolve from external browser when using public Codespaces port.
+
+**Fix applied:**
+```js
+const API = '';  // relative URL — works from any hostname
+```
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: After fix, frontend loads correctly on public Codespaces port URL.
+
+---
+
+### [2026-04-22 — Push Changes to dev3]
+
+#### ACTION TYPE: CLI
+#### PURPOSE: Push all new code to remote dev3 branch
+
+```bash
+git pull --rebase origin dev3  # resolved "fetch first" rejection
+git push origin dev3
+```
+
+#### STATUS: SUCCESS
+
+---
+
+### [2026-04-22 — Commit .github/agents Folder]
+
+#### ACTION TYPE: CLI
+#### PURPOSE: Commit previously untracked .github/agents/ folder
+
+```bash
+git add .github/agents/
+git commit -m "feat: add GitHub agents configuration"
+git push origin dev3
+```
+
+Note: User explicitly requested **no Claude co-author** in commit messages.
+
+#### STATUS: SUCCESS
+
+---
+
+### [2026-04-22 — Claude Marketplace Plugin Auto-Sync System]
+
+#### ACTION TYPE: CODE / CONFIG
+#### PURPOSE: Auto-register Claude agents/commands/skills from claude-marketplace/ into .claude/ on every container start
+
+**Files created/modified:**
+
+1. `.devcontainer/sync-marketplace.sh` (new) — idempotent sync script
+   - Originally used relative symlinks (`ln -sf` + `realpath --relative-to`)
+   - **LATER CHANGED** to use `cp -f` + `diff` check (see fix below)
+   - Scans: `claude-marketplace/plugins/*/agents/*.md` → `.claude/agents/`
+   - Scans: `claude-marketplace/plugins/*/commands/*.md` → `.claude/commands/`
+   - Scans: `claude-marketplace/plugins/*/skills/*/SKILL.md` → `.claude/skills/<name>/SKILL.md`
+
+2. `.devcontainer/setup.sh` — added steps:
+   - Step 7: `bash sync-marketplace.sh`
+   - Step 8: launch `keepalive.py` via `nohup` if not already running
+
+3. `.devcontainer/start.sh` — added same steps 7 & 8
+
+Commit: `8a37010` — `feat: auto-sync Claude marketplace plugins on container start/create`
+
+#### STATUS: SUCCESS
+
+---
+
+### [2026-04-22 — Fix: Symlinks Don't Work for Claude Code Slash Commands]
+
+#### ACTION TYPE: CODE
+#### PURPOSE: Fix /generate-system-prompt not appearing in Claude Code slash command menu
+
+**Problem:** Claude Code does NOT follow symlinks when scanning `.claude/commands/` for slash commands.
+Original sync script used `ln -sf` (symlinks) — looked correct in shell but invisible to Claude Code.
+
+**Fix:**
+1. Replaced symlinks with real file copies immediately:
+   ```bash
+   cp --remove-destination "$(realpath .claude/commands/generate-system-prompt.md)" .claude/commands/generate-system-prompt.md
+   cp --remove-destination "$(realpath .claude/agents/sys-prompt-agent.md)" .claude/agents/sys-prompt-agent.md
+   cp --remove-destination "$(realpath .claude/skills/system-prompt-generator/SKILL.md)" .claude/skills/system-prompt-generator/SKILL.md
+   ```
+
+2. Rewrote `sync-marketplace.sh` to use `cp -f` with `diff` idempotency check:
+   ```bash
+   sync_file() {
+       local src="$1" dst="$2"
+       if [ -f "$dst" ] && diff -q "$src" "$dst" >/dev/null 2>&1; then
+           skipped=$((skipped + 1))
+       else
+           cp -f "$src" "$dst" && installed=$((installed + 1)) || errors=$((errors + 1))
+       fi
+   }
+   ```
+
+After fix: reload VSCode window (`Ctrl+Shift+P` → "Developer: Reload Window"), then `/` shows the command.
+
+#### STATUS: SUCCESS
+#### RULE LEARNED: Claude Code slash commands need REAL files in `.claude/commands/`, not symlinks.
+
+---
+
+### [2026-04-22 — Session Documentation]
+
+#### ACTION TYPE: CODE
+#### PURPOSE: Create persistent session summary at repo root
+
+Created `compact_session_summary.md` — full summary of all features built, bugs fixed, commits, and how to run everything. No sensitive info (no keys/credentials).
+
+#### STATUS: SUCCESS
+
+---
+
+## CURRENTLY REGISTERED ASSETS IN `.claude/`
+
+| Type    | File                                              | Source Plugin            |
+|---------|---------------------------------------------------|--------------------------|
+| Command | `.claude/commands/generate-system-prompt.md`      | sys-prompt-generator     |
+| Agent   | `.claude/agents/sys-prompt-agent.md`              | sys-prompt-generator     |
+| Skill   | `.claude/skills/system-prompt-generator/SKILL.md` | sys-prompt-generator     |
+
+To use: press `/` in Claude Code → type `generate-system-prompt`
+
+---
+
+## HOW TO RUN SERVERS
+
+```bash
+# Navigate to project folder
+cd "/workspaces/starburst-demo/gen ai project/starburst-mcp2"
+
+# Start chatbot server (headless JWT, port 8000) — PRIMARY
+nohup python3 -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000 > /tmp/app_jwt.log 2>&1 &
+
+# Start original server (browser OAuth, port 8001) — SECONDARY
+nohup python3 -m uvicorn app:app --host 0.0.0.0 --port 8001 > /tmp/app.log 2>&1 &
+
+# Start keepalive (prevent free-cluster idle suspension)
+nohup python3 keepalive.py >> keepalive.log 2>&1 &
+
+# Check server logs
+tail -f /tmp/app_jwt.log
+tail -f keepalive.log
+
+# Kill a server
+pkill -f "uvicorn app_jwt"
+pkill -f "uvicorn app:"
+```
+
+---
+
+## KNOWN PATTERNS / DECISIONS
+
+- Development protocol: log-before-execute, mandatory chain of thought
+- **Symlink rule:** Claude Code doesn't follow symlinks in `.claude/` — always use real files
+- **Relative API URL:** `const API = ''` in index.html — never hardcode localhost
+- **keepalive.py:** Always run as background process; devcontainer auto-starts it
+- **No Claude co-author:** User requested all commits exclude `Co-Authored-By: Claude`
+- **Branch:** All work goes to `dev3`, PRs merge to `main`
+
+---
+
+## SECURITY NOTES
+
+- No API keys stored in this file
+- `.env` files never committed
+- Credentials masked wherever logged (`sk-****`, `GXY$****`)
+- `token_cache.json` is gitignored (OAuth token cache)
 
 ---
 
@@ -523,8 +340,206 @@ custkey=1000001 | acctkey=1217470 | products=credit_card,auto_loan | cc_status=o
 
 **To resume this project from any point:**
 
-1. Read `CLAUDE.md` in project root (auto-loaded)
-2. Read this file (`starburst-mcp2-session.md`)
+1. Read `CLAUDE.md` in project root (auto-loaded by Claude Code)
+2. Read this file (`starburst-mcp2-session.md`) for full context
 3. Check **CURRENT STATE** section above
-4. Find the latest **SESSION LOG** entry
-5. Execute the **NEXT STEP** from that entry
+4. Start servers if needed (see HOW TO RUN SERVERS above)
+5. The slash command `/generate-system-prompt` should be available after VSCode reload
+
+**If slash command is missing after container restart:**
+```bash
+bash .devcontainer/sync-marketplace.sh
+# Then reload VSCode window: Ctrl+Shift+P → "Developer: Reload Window"
+```
+
+**If Starburst connection fails (cold start):**
+- Wait 20-60 seconds and retry — free-cluster needs warm-up time
+- Check keepalive is running: `pgrep -f keepalive.py`
+
+**If `app_jwt.py` fails with `ModuleNotFoundError: fastapi`:**
+- Install the StarQuery web extras into the project environment:
+   `pip install fastapi "uvicorn[standard]" openpyxl python-multipart`
+- Then start the server with:
+   `/workspaces/starburst-demo/.venv/bin/python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000`
+
+---
+
+### [2026-05-09 00:00]
+
+#### ACTION TYPE: DESIGN
+#### PURPOSE: Read runtime/authentication docs and identify the correct clean-start procedure for `app_jwt.py`
+#### PRE-EXECUTION
+- Review, in order:
+   1. `/workspaces/starburst-demo/.devcontainer/devcontainer.json`
+   2. `/workspaces/starburst-demo/.devcontainer/setup.sh`
+   3. `/workspaces/starburst-demo/.devcontainer/start.sh`
+   4. `/workspaces/starburst-demo/README.md`
+   5. `/workspaces/starburst-demo/docs/FLOW.md`
+   6. `/workspaces/starburst-demo/gen ai project/starburst-mcp2/STARBURST-AUTH.md`
+   7. `/workspaces/starburst-demo/gen ai project/starburst-mcp2/docs/superpowers/End_User_Documentation.md`
+   8. `/workspaces/starburst-demo/gen ai project/starburst-mcp2/docs/superpowers/Enterprise_Documentation.md`
+   9. `/workspaces/starburst-demo/gen ai project/starburst-mcp2/app_jwt.py`
+- Then inspect the current process state for port 8000, stop any stale server, and start `app_jwt.py` cleanly from `/workspaces/starburst-demo/gen ai project/starburst-mcp2`.
+
+#### EXECUTION RESULT
+Reviewed the requested runtime and authentication sources in order:
+
+1. `.devcontainer/devcontainer.json`
+2. `.devcontainer/setup.sh`
+3. `.devcontainer/start.sh`
+4. `README.md`
+5. `docs/FLOW.md`
+6. `gen ai project/starburst-mcp2/STARBURST-AUTH.md`
+7. `gen ai project/starburst-mcp2/docs/superpowers/End_User_Documentation.md`
+8. `gen ai project/starburst-mcp2/docs/superpowers/Enterprise_Documentation.md`
+9. `gen ai project/starburst-mcp2/app_jwt.py`
+
+Key findings from those files:
+- Devcontainer lifecycle installs only `requirements.txt` plus validation checks; it does not auto-start `app_jwt.py`
+- `keepalive.py` is auto-started, which reduces cold starts but does not make the web UI available by itself
+- `app_jwt.py` is intended to run as a FastAPI/Uvicorn app on port `8000` from `gen ai project/starburst-mcp2`
+- Headless auth depends on a local `.env` with Starburst host/catalog/schema plus `STARBURST_USER` and `STARBURST_PASSWORD`; `StarburstClientJWT` is instantiated at import time
+- `app_jwt.py` serves `index.html` from its own directory, so the project file layout and launch path matter
+- `app_jwt.py`'s `__main__` block points at `uvicorn.run("app:app", ...)`, so the reliable start command is `python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000`
+- README docs list extra StarQuery web dependencies beyond `requirements.txt`, which explains the initial import failure in a fresh environment
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: External session log path from `CLAUDE.md` was not present in the container; the checked-in workspace log was used instead. The clean-start path and the likely failure points were identifiable directly from the requested files.
+#### NEXT STEP: None for this analysis step.
+
+---
+
+### [2026-05-09 00:05]
+
+#### ACTION TYPE: CONFIG
+#### PURPOSE: Resolve the active Python environment for `gen ai project/starburst-mcp2` before running any Python-based server commands
+#### PRE-EXECUTION
+- Configure the Python environment for `/workspaces/starburst-demo/gen ai project/starburst-mcp2`
+- Retrieve the Python executable details for that project so the server start command uses the active environment correctly
+
+#### EXECUTION RESULT
+Configured the Python environment for `/workspaces/starburst-demo/gen ai project/starburst-mcp2` successfully.
+
+- Environment type: `VirtualEnvironment`
+- Python version: `3.13.13`
+- Terminal command prefix: `/workspaces/starburst-demo/.venv/bin/python`
+- Verified the active environment and package inventory for the restart path; later startup validation showed `uvicorn`, `trino`, `python-dotenv`, and `requests` were present while `fastapi` was still missing at that point
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: `app_jwt.py` imports and instantiates `StarburstClientJWT` at module import time, so using the project virtualenv avoids path drift and missing-package startup failures.
+#### NEXT STEP: Execute the clean port-8000 restart sequence with `/workspaces/starburst-demo/.venv/bin/python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000`.
+
+---
+
+### [2026-05-09 00:06]
+
+#### ACTION TYPE: CLI
+#### PURPOSE: Stop any stale process on port 8000 and start `app_jwt.py` cleanly from the project directory
+#### PRE-EXECUTION
+```bash
+cd "/workspaces/starburst-demo/gen ai project/starburst-mcp2"
+lsof -iTCP:8000 -sTCP:LISTEN -Pn || true
+pgrep -af "uvicorn .*8000|app_jwt|app:app" || true
+pkill -f "uvicorn app_jwt:app --host 0.0.0.0 --port 8000" || true
+pkill -f "python3 app_jwt.py" || true
+pkill -f "python app_jwt.py" || true
+nohup python3 -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000 > /tmp/app_jwt.log 2>&1 &
+```
+
+After start, verify with:
+```bash
+cd "/workspaces/starburst-demo/gen ai project/starburst-mcp2"
+lsof -iTCP:8000 -sTCP:LISTEN -Pn || true
+curl -I http://127.0.0.1:8000/
+tail -n 80 /tmp/app_jwt.log
+```
+
+#### EXECUTION RESULT
+Attempted clean restart with the project virtualenv and verified the captured server log.
+
+Observed outcome:
+- Background server process exited immediately with status `1`
+- `/tmp/app_jwt.log` captured the exact startup failure:
+
+```text
+Traceback (most recent call last):
+   File "/workspaces/starburst-demo/gen ai project/starburst-mcp2/app_jwt.py", line 11, in <module>
+      from fastapi import FastAPI, HTTPException, Response
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+#### STATUS: FAILURE
+#### OBSERVATIONS: Port 8000 was not the blocking issue. The active virtualenv is missing StarQuery web runtime dependencies, so `uvicorn app_jwt:app` cannot import the module. `if __name__ == "__main__"` in `app_jwt.py` also points at `app:app`, which is another reason to avoid starting it via `python app_jwt.py`.
+#### NEXT STEP: Install the missing web app dependencies in the active virtualenv, then retry the clean port-8000 start and verification sequence.
+
+---
+
+### [2026-05-09 00:08]
+
+#### ACTION TYPE: CONFIG
+#### PURPOSE: Install missing StarQuery web runtime dependencies required by `app_jwt.py`
+#### PRE-EXECUTION
+- Install these Python packages into the active project environment:
+   - `fastapi`
+   - `uvicorn[standard]`
+   - `openpyxl`
+   - `python-multipart`
+
+#### EXECUTION RESULT
+Installed the missing StarQuery web runtime packages into the active project virtualenv successfully:
+
+- `fastapi`
+- `uvicorn[standard]`
+- `openpyxl`
+- `python-multipart`
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: The failure was environment-specific, not a syntax or import path problem inside `app_jwt.py`. The active virtualenv now has the packages the README calls out for the web UI path.
+#### NEXT STEP: Retry the clean port-8000 start and verification sequence for `app_jwt.py`.
+
+---
+
+### [2026-05-09 00:10]
+
+#### ACTION TYPE: CLI
+#### PURPOSE: Retry the clean `app_jwt.py` startup after installing missing web dependencies
+#### PRE-EXECUTION
+```bash
+cd "/workspaces/starburst-demo/gen ai project/starburst-mcp2"
+lsof -iTCP:8000 -sTCP:LISTEN -Pn || true
+pgrep -af "uvicorn .*8000|app_jwt|app:app" || true
+pids=$(lsof -t -iTCP:8000 -sTCP:LISTEN -Pn || true)
+if [[ -n "$pids" ]]; then kill $pids; fi
+nohup /workspaces/starburst-demo/.venv/bin/python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8000 > /tmp/app_jwt.log 2>&1 &
+```
+
+After start, verify with:
+```bash
+cd "/workspaces/starburst-demo/gen ai project/starburst-mcp2"
+lsof -iTCP:8000 -sTCP:LISTEN -Pn || true
+curl -I http://127.0.0.1:8000/
+tail -n 80 /tmp/app_jwt.log
+```
+
+#### EXECUTION RESULT
+Retried the clean startup after installing the missing web dependencies.
+
+Verification results:
+- Port 8000 listener present:
+   - `python` PID `4717` listening on `*:8000`
+- UI entrypoint check:
+   - `GET /` returned `HTTP/1.1 200 OK`
+   - Response body begins with `<!DOCTYPE html>` from `index.html`
+- Backend API check:
+   - `POST /api/query` with `{"sql":"SELECT 1"}` returned `{"columns":["_col0"],"rows":[[1]],"row_count":1}`
+- UI bootstrap check:
+   - `GET /api/schema` returned schema JSON successfully
+- Uvicorn log summary:
+   - Server started successfully
+   - Application startup completed
+   - Running at `http://0.0.0.0:8000`
+   - An informational OAuth URL was printed by the auth stack, but headless query execution still succeeded without manual browser interaction
+
+#### STATUS: SUCCESS
+#### OBSERVATIONS: The earlier failure was fully explained by missing web dependencies in the fresh environment. After installing them, the app served both the UI and live backend data on port 8000.
+#### NEXT STEP: None — clean restart and verification complete.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# sync-marketplace.sh — syncs Claude marketplace plugin assets into .claude/
+# sync-marketplace.sh — copies Claude marketplace plugin assets into .claude/
 # Idempotent: safe to run on every container start, restart, or rebuild.
-# Uses relative symlinks so they work on any clone path.
+# Uses file copies (not symlinks) so Claude Code can discover them reliably.
 # Installs: agents → .claude/agents/, commands → .claude/commands/, skills → .claude/skills/
 set -euo pipefail
 
@@ -23,34 +23,30 @@ installed=0
 skipped=0
 errors=0
 
-# Compute relative symlink path from $dst_dir to $src
-rel_path() {
-    local src="$1" dst_dir="$2"
-    realpath --relative-to="$dst_dir" "$src"
+# Copy src to dst only if content differs (idempotent)
+sync_file() {
+    local src="$1" dst="$2"
+    if [ -f "$dst" ] && diff -q "$src" "$dst" >/dev/null 2>&1; then
+        skipped=$((skipped + 1))
+    else
+        cp -f "$src" "$dst" && installed=$((installed + 1)) || errors=$((errors + 1))
+    fi
 }
 
 # ── Agents ──────────────────────────────────────
 while IFS= read -r -d '' src; do
     name="$(basename "$src")"
     dst="$AGENTS_DST/$name"
-    rel="$(rel_path "$src" "$AGENTS_DST")"
-    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$rel" ]; then
-        skipped=$((skipped + 1))
-    else
-        ln -sf "$rel" "$dst" && echo "  [agent]   $name" && installed=$((installed + 1)) || errors=$((errors + 1))
-    fi
+    echo "  [agent]   $name"
+    sync_file "$src" "$dst"
 done < <(find "$MARKETPLACE" -path "*/agents/*.md" -print0 2>/dev/null)
 
 # ── Commands ────────────────────────────────────
 while IFS= read -r -d '' src; do
     name="$(basename "$src")"
     dst="$COMMANDS_DST/$name"
-    rel="$(rel_path "$src" "$COMMANDS_DST")"
-    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$rel" ]; then
-        skipped=$((skipped + 1))
-    else
-        ln -sf "$rel" "$dst" && echo "  [command] $name" && installed=$((installed + 1)) || errors=$((errors + 1))
-    fi
+    echo "  [command] $name"
+    sync_file "$src" "$dst"
 done < <(find "$MARKETPLACE" -path "*/commands/*.md" -print0 2>/dev/null)
 
 # ── Skills ──────────────────────────────────────
@@ -59,12 +55,8 @@ while IFS= read -r -d '' src; do
     skill_dst_dir="$SKILLS_DST/$skill_name"
     mkdir -p "$skill_dst_dir"
     dst="$skill_dst_dir/SKILL.md"
-    rel="$(rel_path "$src" "$skill_dst_dir")"
-    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$rel" ]; then
-        skipped=$((skipped + 1))
-    else
-        ln -sf "$rel" "$dst" && echo "  [skill]   $skill_name/SKILL.md" && installed=$((installed + 1)) || errors=$((errors + 1))
-    fi
+    echo "  [skill]   $skill_name/SKILL.md"
+    sync_file "$src" "$dst"
 done < <(find "$MARKETPLACE" -path "*/skills/*/SKILL.md" -print0 2>/dev/null)
 
 # ── Summary ─────────────────────────────────────

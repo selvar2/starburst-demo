@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StarQuery AI</title>
+<title>Data Analytics AI</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -100,7 +100,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .row-badge{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(168,85,247,.15);color:var(--accent1);margin-bottom:10px}
 .data-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
 .data-table{width:100%;border-collapse:collapse;font-size:.8rem}
-.data-table th{padding:8px 12px;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:rgba(0,0,0,.15);white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0}
+.data-table th{padding:8px 12px;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface3);white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2}
+[data-theme="light"] .data-table th{background:var(--surface3)}
 .data-table td{padding:7px 12px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 .data-table tbody tr:nth-child(even){background:rgba(0,0,0,.06)}
 .data-table tbody tr:hover{background:rgba(168,85,247,.06)}
@@ -179,7 +180,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
       <div>
-        <div class="gradient-text" style="font-weight:800;font-size:1.1rem">StarQuery AI</div>
+        <div class="gradient-text" style="font-weight:800;font-size:1.1rem">Data Analytics AI</div>
         <div style="font-size:.65rem;color:var(--muted)">Intelligent Data Explorer</div>
       </div>
     </div>
@@ -369,7 +370,7 @@ function renderWelcome(){
     <div class="logo-icon" style="width:64px;height:64px;border-radius:18px;font-size:28px">
       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-    <h2 class="gradient-text">Welcome to StarQuery AI</h2>
+    <h2 class="gradient-text">Welcome to Data Analytics AI</h2>
     <p>Ask questions about your data in natural language. I'll write SQL, fetch results, and visualize them for you.</p>
     <div class="chips">
       <div class="chip" onclick="sendChip(this)">Show all tables</div>
@@ -395,19 +396,20 @@ function autoResize(el){
 }
 
 // Send message
-async function sendMessage(prefill){
+async function sendMessage(prefill,sqlOverride){
   const input=document.getElementById('chatInput');
-  const text=(prefill||input.value).trim();
-  if(!text)return;
+  const displayText=(prefill||input.value).trim();
+  const queryText=sqlOverride||displayText;
+  if(!displayText)return;
   input.value='';input.style.height='auto';
 
   // Clear welcome
   if(state.messages.length===0){document.getElementById('chatMessages').innerHTML=''}
 
   const msgId='msg_'+Date.now();
-  state.messages.push({role:'user',text});
-  addHistory(text);
-  appendUserMsg(text);
+  state.messages.push({role:'user',text:displayText});
+  addHistory(displayText);
+  appendUserMsg(displayText);
   appendTyping();
   scrollChat();
   document.getElementById('sendBtn').disabled=true;
@@ -415,7 +417,7 @@ async function sendMessage(prefill){
   try{
     const res=await fetch(API+'/api/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:text,context:{catalog:'mcp2ohio',schema:'test_writes'}})
+      body:JSON.stringify({message:queryText,context:{catalog:'mcp2ohio',schema:'test_writes'}})
     });
     const data=await res.json();
     removeTyping();
@@ -496,7 +498,10 @@ function appendBotMsg(data,msgId){
   if(suggestions.length){
     html+=`<div class="suggestions-row">`;
     suggestions.forEach(s=>{
-      html+=`<button class="suggestion-chip" onclick="sendMessage('${s.replace(/'/g,"\\'")}')"><span class="chip-icon">${s.startsWith('Show')?'📋':s.startsWith('Describe')?'🔍':s.startsWith('Count')?'🔢':s.startsWith('SELECT')?'⚡':'💡'}</span>${esc(s)}</button>`;
+      const lbl=s.label||s;
+      const q=(s.sql||s).replace(/'/g,"\\'");
+      const display=lbl.replace(/'/g,"\\'");
+      html+=`<button class="suggestion-chip" onclick="sendMessage('${display}','${q}')"><span class="chip-icon">${getChipIcon(lbl)}</span>${esc(lbl)}</button>`;
     });
     html+=`</div>`;
   }
@@ -518,56 +523,76 @@ function getFQTable(sql){
   return m?m[1]:null;
 }
 
+function getChipIcon(label){
+  const l=label.toLowerCase();
+  if(l.startsWith('show all table')||l.startsWith('show tables')||l.startsWith('list')) return '📋';
+  if(l.startsWith('describe')) return '🔍';
+  if(l.startsWith('count')) return '🔢';
+  if(l.startsWith('sum')||l.startsWith('average')||l.startsWith('group by')) return '📊';
+  if(l.startsWith('show all data')||l.startsWith('show data')||l.startsWith('show me')) return '📄';
+  return '💡';
+}
+
+function fqLocation(fq){
+  // Returns "catalog.schema" from "catalog.schema.table"
+  const parts=fq.split('.');
+  return parts.length>=3?parts.slice(0,2).join('.'):fq;
+}
+
 function getSuggestions(data){
   const sql=(data.sql||'');
   const sqlUp=sql.toUpperCase();
   const cols=data.columns||[];
   const rows=data.rows||[];
   const suggestions=[];
-  const fq=getFQTable(sql); // e.g. mcp2ohio.information_schema.roles
+  const fq=getFQTable(sql);
 
-  // After SHOW TABLES → suggest using full qualified names
+  // After SHOW TABLES
   if(sqlUp.includes('SHOW TABLES')){
     const schemaMatch=sql.match(/FROM\s+(\w+\.\w+)/i);
     const prefix=schemaMatch?schemaMatch[1]:'mcp2ohio.test_writes';
-    rows.slice(0,5).forEach(r=>{
+    rows.slice(0,3).forEach(r=>{
       const t=r[0];
-      suggestions.push(`DESCRIBE ${prefix}.${t}`);
-      suggestions.push(`SELECT * FROM ${prefix}.${t} LIMIT 100`);
+      suggestions.push({label:`Describe ${t} (${prefix})`,         sql:`DESCRIBE ${prefix}.${t}`});
+      suggestions.push({label:`Show all data from ${t} (${prefix})`,sql:`SELECT * FROM ${prefix}.${t} LIMIT 100`});
     });
-    return suggestions;
+    return suggestions.slice(0,6);
   }
 
-  // After DESCRIBE → use full qualified table
+  // After DESCRIBE
   if(sqlUp.includes('DESCRIBE')){
     if(fq){
-      suggestions.push(`SELECT * FROM ${fq} LIMIT 100`);
-      suggestions.push(`SELECT COUNT(*) FROM ${fq}`);
+      const tName=fq.split('.').pop();
+      const loc=fqLocation(fq);
+      suggestions.push({label:`Show all data from ${tName} (${fq})`,  sql:`SELECT * FROM ${fq} LIMIT 100`});
+      suggestions.push({label:`Count rows in ${tName} (${fq})`,       sql:`SELECT COUNT(*) FROM ${fq}`});
       const numCols=rows.filter(r=>String(r[1]||'').toLowerCase().match(/int|double|decimal|float|bigint|real/)).map(r=>r[0]);
       numCols.slice(0,2).forEach(c=>{
-        suggestions.push(`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`);
+        suggestions.push({label:`Group by ${c} in ${tName} (${fq})`,  sql:`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`});
       });
       if(numCols.length){
-        suggestions.push(`SELECT SUM(${numCols[0]}) FROM ${fq}`);
+        suggestions.push({label:`Sum of ${numCols[0]} in ${tName} (${fq})`, sql:`SELECT SUM(${numCols[0]}) FROM ${fq}`});
       }
     }
-    return suggestions;
+    return suggestions.slice(0,6);
   }
 
-  // After SELECT * → suggest with full qualified table
+  // After SELECT *
   if(sqlUp.includes('SELECT *')){
     if(fq){
-      suggestions.push(`SELECT COUNT(*) FROM ${fq}`);
-      suggestions.push(`DESCRIBE ${fq}`);
+      const tName=fq.split('.').pop();
+      const loc=fqLocation(fq);
+      suggestions.push({label:`Count rows in ${tName} (${fq})`,    sql:`SELECT COUNT(*) FROM ${fq}`});
+      suggestions.push({label:`Describe ${tName} (${fq})`,          sql:`DESCRIBE ${fq}`});
       cols.forEach((c,i)=>{
         if(rows.length>0&&typeof rows[0][i]==='string'&&c.toLowerCase()!=='id'){
-          suggestions.push(`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`);
+          suggestions.push({label:`Group by ${c} · ${tName} (${fq})`, sql:`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`});
         }
       });
       cols.forEach((c,i)=>{
         if(rows.length>0&&typeof rows[0][i]==='number'&&c.toLowerCase()!=='id'){
-          suggestions.push(`SELECT SUM(${c}) FROM ${fq}`);
-          suggestions.push(`SELECT AVG(${c}) FROM ${fq}`);
+          suggestions.push({label:`Sum of ${c} · ${tName} (${fq})`,    sql:`SELECT SUM(${c}) FROM ${fq}`});
+          suggestions.push({label:`Average of ${c} · ${tName} (${fq})`,sql:`SELECT AVG(${c}) FROM ${fq}`});
         }
       });
     }
@@ -577,21 +602,31 @@ function getSuggestions(data){
   // After COUNT/SUM/AVG/aggregation
   if(sqlUp.match(/SELECT\s+(COUNT|SUM|AVG|MIN|MAX)\(/)){
     if(fq){
-      suggestions.push(`SELECT * FROM ${fq} LIMIT 100`);
-      suggestions.push(`DESCRIBE ${fq}`);
-      suggestions.push(`Show all tables`);
+      const tName=fq.split('.').pop();
+      const loc=fqLocation(fq);
+      suggestions.push({label:`Show all data from ${tName} (${fq})`, sql:`SELECT * FROM ${fq} LIMIT 100`});
+      suggestions.push({label:`Describe ${tName} (${fq})`,            sql:`DESCRIBE ${fq}`});
+      suggestions.push({label:`Show all tables in ${loc}`,              sql:`SHOW TABLES FROM ${loc}`});
     }
     return suggestions;
   }
 
   // After SHOW SCHEMAS
   if(sql.includes('SHOW SCHEMAS')){
-    rows.slice(0,5).forEach(r=>suggestions.push(`Show all tables`));
-    return ['Show all tables','Describe demo table','Show all data from demo'];
+    return [
+      {label:`Show all tables in mcp2ohio.test_writes`,                              sql:`SHOW TABLES FROM mcp2ohio.test_writes`},
+      {label:`Describe demo (mcp2ohio.test_writes.demo)`,                            sql:`DESCRIBE mcp2ohio.test_writes.demo`},
+      {label:`Show all data from demo (mcp2ohio.test_writes.demo)`,                  sql:`SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100`}
+    ];
   }
 
   // Default fallback
-  return ['Show all tables','Describe demo table','Show all data from demo','Count rows in demo'];
+  return [
+    {label:`Show all tables in mcp2ohio.test_writes`,                                sql:`SHOW TABLES FROM mcp2ohio.test_writes`},
+    {label:`Describe demo (mcp2ohio.test_writes.demo)`,                              sql:`DESCRIBE mcp2ohio.test_writes.demo`},
+    {label:`Show all data from demo (mcp2ohio.test_writes.demo)`,                    sql:`SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100`},
+    {label:`Count rows in demo (mcp2ohio.test_writes.demo)`,                         sql:`SELECT COUNT(*) FROM mcp2ohio.test_writes.demo`}
+  ];
 }
 
 function renderTable(columns,rows,msgId){
@@ -646,26 +681,91 @@ async function doExport(type,msgId){
     }catch(e){showToast('Export failed: '+e.message,'error')}
   }else if(type==='pdf'){
     try{
-      const area=document.getElementById(msgId+'_data');
-      if(!area){showToast('No data to export','error');return}
-      const canvas=await html2canvas(area,{backgroundColor:null,scale:2});
+      const msg=state.messages.find(m=>m.id===msgId);
+      if(!msg||!msg.data){showToast('No data to export','error');return}
+      const{columns,rows,sql}=msg.data;
       const{jsPDF}=window.jspdf;
       const pdf=new jsPDF('l','mm','a4');
-      const w=pdf.internal.pageSize.getWidth()-20;
-      const h=canvas.height*w/canvas.width;
-      pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,w,h);
-      // Also add chart if present
-      const chartCanvas=document.getElementById(msgId+'_chart');
-      if(chartCanvas&&chartCanvas.width>0){
-        const ch=await html2canvas(chartCanvas.parentElement,{backgroundColor:null,scale:2});
-        const cw=pdf.internal.pageSize.getWidth()-20;
-        const chh=ch.height*cw/ch.width;
-        if(h+chh+20>pdf.internal.pageSize.getHeight()){pdf.addPage()}
-        pdf.addImage(ch.toDataURL('image/png'),'PNG',10,h+20,cw,chh);
+      const PW=pdf.internal.pageSize.getWidth();
+      const PH=pdf.internal.pageSize.getHeight();
+      const M=14;const CW=PW-M*2;
+      let pageNum=1;
+
+      function frame(){
+        // ── Top header bar ──
+        pdf.setFillColor(26,35,72);pdf.rect(0,0,PW,18,'F');
+        pdf.setFillColor(41,98,255);pdf.rect(0,18,PW,1.5,'F');
+        pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(12);
+        pdf.text('Data Analytics AI',M,12);
+        pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+        pdf.text(new Date().toLocaleString(),PW-M,12,{align:'right'});
+        // ── Footer bar ──
+        pdf.setFillColor(248,249,252);pdf.rect(0,PH-12,PW,12,'F');
+        pdf.setDrawColor(210,213,220);pdf.setLineWidth(0.3);pdf.line(0,PH-12,PW,PH-12);
+        pdf.setTextColor(90,95,115);pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);
+        pdf.text('Generated by Data Analytics AI  •  Confidential & Internal Use Only',M,PH-4.5);
+        pdf.text('Page '+pageNum,PW-M,PH-4.5,{align:'right'});
       }
+
+      frame();
+
+      // ── Report title & meta ──
+      let y=26;
+      pdf.setTextColor(25,28,40);pdf.setFont('helvetica','bold');pdf.setFontSize(16);
+      pdf.text('Query Export Report',M,y);y+=7;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(90,95,115);
+      pdf.text(rows.length+' rows  •  '+columns.length+' columns  •  Exported: '+new Date().toLocaleString(),M,y);
+
+      // ── SQL pill ──
+      if(sql){
+        y+=7;
+        pdf.setFillColor(237,240,250);pdf.roundedRect(M,y,CW,11,2,2,'F');
+        pdf.setTextColor(60,80,160);pdf.setFont('courier','normal');pdf.setFontSize(7.5);
+        pdf.text((sql.length>180?sql.slice(0,177)+'...':sql),M+3,y+7);
+        y+=16;
+      }else{y+=7}
+
+      // ── Divider ──
+      pdf.setDrawColor(210,213,220);pdf.setLineWidth(0.3);pdf.line(M,y,PW-M,y);y+=5;
+
+      // ── Table ──
+      const colW=CW/columns.length;
+      const maxChars=Math.max(8,Math.floor((colW-6)/1.9));
+      const RH=8,HH=10;
+
+      function thead(yy){
+        pdf.setFillColor(30,40,80);pdf.rect(M,yy,CW,HH,'F');
+        pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+        columns.forEach((c,i)=>{
+          const lbl=String(c).toUpperCase();
+          pdf.text(lbl.length>maxChars?lbl.slice(0,maxChars-1)+'…':lbl,M+i*colW+3,yy+6.5);
+        });
+      }
+
+      thead(y);y+=HH;
+
+      rows.forEach((row,ri)=>{
+        if(y+RH>PH-16){pageNum++;pdf.addPage();frame();y=24;thead(y);y+=HH}
+        // Row background (alternating)
+        pdf.setFillColor(...(ri%2===1?[245,246,250]:[255,255,255]));
+        pdf.rect(M,y,CW,RH,'F');
+        // Row bottom border
+        pdf.setDrawColor(210,213,220);pdf.setLineWidth(0.2);
+        pdf.line(M,y+RH,PW-M,y+RH);
+        // Column separators
+        columns.forEach((_,ci)=>{if(ci>0)pdf.line(M+ci*colW,y,M+ci*colW,y+RH)});
+        // Cell text
+        pdf.setTextColor(25,28,40);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+        row.forEach((val,ci)=>{
+          const v=val==null?'':String(val);
+          pdf.text(v.length>maxChars?v.slice(0,maxChars-1)+'…':v,M+ci*colW+3,y+5.5);
+        });
+        y+=RH;
+      });
+
       pdf.save(title+'.pdf');
       showToast('PDF exported','success');
-    }catch(e){showToast('PDF export failed','error')}
+    }catch(e){showToast('PDF export failed: '+e.message,'error')}
   }else if(type==='jpeg'){
     try{
       // Capture the full bot message bubble (table + chart + everything)
