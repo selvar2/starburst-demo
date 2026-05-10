@@ -18,7 +18,7 @@
       ]
     }
   },
-  "forwardPorts": [],
+  "forwardPorts": [8001],
   "remoteEnv": {
     "PYTHONUNBUFFERED": "1",
     "PIP_NO_CACHE_DIR": "1"

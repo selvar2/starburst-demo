@@ -8351,3 +8351,141 @@ Confirmed before commit:
 - .deps, .venv, .tmp, and backup snapshots were excluded.
 - Prompt file with working SQL/NL operation prompts was included.
 ```
+
+---
+
+# 2026-05-11 Codespaces Run Documentation
+
+## User Request
+
+```text
+1 . update readme.md
+
+2. now we are going to run the application in github codespaces environment . which is a linux environment .
+
+so create another instruction-for-running-application , manual-to-run-application file - md . which will enable the llm , ai to read this file and able to run the application . add instructions to install dependencies , packages . so that after installing it can run . if the linux environment already has depedencis installed , it can skip it . cover every instruction to run the app . because i should make mutliple prompts to understand the ai-llm and then after multiple troubleshooting only. it is starting the application . so make sure your documentation is very clear so human , ai-llm , non technical person can run the application inside a github codespaces vm - linux environment .
+```
+
+## Files Modified
+
+```text
+C:\Users\Lenovo\ai-project\starburst-mcp7\README.md
+C:\Users\Lenovo\ai-project\starburst-mcp7\.devcontainer\devcontainer.json
+C:\Users\Lenovo\ai-project\starburst-mcp7\gen-ai-project\starburst-mcp2\requirements.txt
+```
+
+## Files Created
+
+```text
+C:\Users\Lenovo\ai-project\starburst-mcp7\instruction-for-running-application-codespaces.md
+C:\Users\Lenovo\ai-project\starburst-mcp7\manual-to-run-application-codespaces.md
+```
+
+## README Updates
+
+```text
+- Added GitHub Codespaces / Linux Quick Start.
+- Updated StarQuery AI web URL from port 8000 to port 8001.
+- Documented provider-agnostic LLM support and deterministic fallback.
+- Linked the new instruction and manual markdown files.
+- Updated Codespaces deployment guidance.
+- Updated Docker command example to use requirements.txt and port 8001.
+```
+
+## Dependency Updates
+
+Added the web application dependencies directly to:
+
+```text
+gen-ai-project/starburst-mcp2/requirements.txt
+```
+
+### Added Packages
+
+```text
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+openpyxl>=3.1.0
+python-multipart>=0.0.9
+```
+
+## Codespaces Port Forwarding
+
+Updated:
+
+```text
+.devcontainer/devcontainer.json
+```
+
+### New Port Configuration
+
+```json
+"forwardPorts": [8001]
+```
+
+## New Instruction File Purpose
+
+```text
+instruction-for-running-application-codespaces.md
+```
+
+Designed for AI agents / LLM coding assistants. It gives deterministic commands to:
+
+```text
+- enter the app directory
+- detect Python
+- create and activate .venv
+- check whether dependencies already exist
+- install dependencies only if needed
+- create .env
+- configure Starburst
+- configure LLM / DeepSeek / OpenAI / Anthropic examples with masked keys
+- validate environment variables
+- validate app imports
+- start Uvicorn on 0.0.0.0:8001
+- run curl health checks
+- troubleshoot common failures
+```
+
+## New Manual File Purpose
+
+```text
+manual-to-run-application-codespaces.md
+```
+
+Designed for humans and non-technical users. It provides a slower, step-by-step guide for:
+
+```text
+- opening Codespaces terminal
+- setting up Python
+- installing packages
+- configuring .env
+- enabling/disabling LLM
+- validating Starburst connection
+- starting the web app
+- opening forwarded port 8001
+- testing browser prompts
+- troubleshooting auth, port, dependency, and LLM issues
+```
+
+## Validation Checks
+
+### CLI Input
+
+```powershell
+git diff --stat
+Select-String -Path README.md,instruction-for-running-application-codespaces.md,manual-to-run-application-codespaces.md -Pattern '8000|8001|Codespaces|uvicorn app_jwt'
+git status --short
+```
+
+### CLI Output Summary
+
+```text
+README.md updated with Codespaces section and port 8001 references.
+instruction-for-running-application-codespaces.md created.
+manual-to-run-application-codespaces.md created.
+requirements.txt updated with FastAPI/Uvicorn/web dependencies.
+.devcontainer/devcontainer.json forwards port 8001.
+No real LLM key was added; examples use masked placeholder values.
+```

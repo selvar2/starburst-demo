@@ -42,14 +42,14 @@
 | Surface | Audience | Interface |
 |---|---|---|
 | **`starburst-rw` MCP server** | AI agents (Claude Code, Claude Desktop, other MCP clients) | stdio / JSON-RPC |
-| **StarQuery AI** | Business users, analysts | Browser chat UI at `http://localhost:8000` |
+| **StarQuery AI** | Business users, analysts | Browser chat UI at `http://localhost:8001` |
 
 Both share a JWT-based headless auth path, a per-developer permission layer, and a hardened SQL execution engine.
 
 ## Features
 
 - **14 MCP tools** — 5 read (`execute_query`, `list_catalogs`, `show_schemas`, `show_tables`, `describe_table`) + 9 write (CRUD, DDL, MERGE) with confirm guards on destructive ops.
-- **Natural-language SQL** — regex-based NL→SQL translator covers `show tables`, `describe`, `count rows`, `top N`, `sum/avg/min/max`, `group by`, and cross-schema lookups.
+- **Natural-language SQL with optional LLM** — direct SQL always works, deterministic fallback covers common enterprise prompts, and the provider-agnostic LLM layer supports schema-aware NL2SQL through OpenAI-compatible providers such as DeepSeek, OpenAI, Kimi, plus Anthropic/Claude.
 - **Headless OAuth2** — logs in via the Galaxy token endpoint; no browser popup; cached token auto-refreshes.
 - **Per-developer permissions** — YAML config with profiles (`read_only`, `analyst`, `engineer`, `admin`) and per-user overrides, hot-reloaded.
 - **Rich chatbot UX** — schema browser, Chart.js visualizations, CSV / Excel / HTML / PDF / JPEG export, dark/light mode.
@@ -62,6 +62,7 @@ Both share a JWT-based headless auth path, a per-developer permission layer, and
 - **Database:** Starburst Galaxy (Trino) via `trino` DBAPI
 - **MCP:** `mcp>=1.0.0` (FastMCP, stdio transport)
 - **Web:** FastAPI + Uvicorn, vanilla HTML/JS frontend, Chart.js
+- **AI:** Provider-agnostic LLM adapter, grounded schema context, SQL validation, deterministic fallback
 - **Config:** PyYAML, python-dotenv
 - **Tests:** pytest
 
@@ -112,7 +113,6 @@ source .venv/bin/activate          # Linux/macOS
 
 # 3. Install dependencies
 pip install -r requirements.txt
-pip install fastapi "uvicorn[standard]" openpyxl python-multipart  # for StarQuery AI
 
 # 4. Configure environment
 cp .env.example .env
@@ -121,6 +121,41 @@ cp .env.example .env
 # 5. Verify
 python -c "from starburst_client_jwt import StarburstClient; print(StarburstClient().execute('SELECT 1'))"
 ```
+
+## GitHub Codespaces / Linux Quick Start
+
+Use this when running inside a GitHub Codespaces VM or any fresh Linux environment.
+
+```bash
+# From the repository root
+cd gen-ai-project/starburst-mcp2
+
+# Optional but recommended: create an isolated virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies. If imports already work, this step can be skipped.
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# Create the local environment file. Never commit this file.
+cp .env.example .env
+nano .env
+
+# Start the web app on the project demo port
+python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8001
+```
+
+Open the forwarded Codespaces port `8001` in the browser. The app should load at:
+
+```text
+http://127.0.0.1:8001/
+```
+
+For detailed step-by-step instructions for humans and AI agents, see:
+
+- [`instruction-for-running-application-codespaces.md`](instruction-for-running-application-codespaces.md)
+- [`manual-to-run-application-codespaces.md`](manual-to-run-application-codespaces.md)
 
 ## Configuration
 
@@ -199,8 +234,8 @@ Start the server:
 
 ```bash
 cd "gen-ai-project/starburst-mcp2"
-python -m uvicorn app_jwt:app --port 8000
-# → open http://localhost:8000
+python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8001
+# open http://localhost:8001 or the forwarded Codespaces port 8001
 ```
 
 **Example — natural language:**
@@ -243,7 +278,7 @@ Output:  "I couldn't understand that query. Try phrases like:
           - Or enter raw SQL directly."
 ```
 
-**Supported NL prompt patterns** (full list): `show tables`, `describe <table>`, `show all data from <table>`, `count rows in <table>`, `top <N> <column> from <table>`, `sum/avg/min/max of <column> from <table>`, `group by <column> from <table>`, raw SQL pass-through, plus context modifiers (`X is part of <schema> schema and part of <catalog> catalog`).
+**Supported input patterns:** raw SQL pass-through; deterministic natural-language fallback for `show tables`, `describe <table>`, `show all data from <table>`, `count rows in <table>`, `top <N> <column> from <table>`, `sum/avg/min/max of <column> from <table>`, `group by <column> from <table>`; governed CREATE/INSERT/UPDATE/DELETE patterns; and optional schema-aware LLM NL2SQL when `LLM_ENABLED=true`.
 
 ### C. Keepalive Daemon
 
@@ -351,7 +386,12 @@ Current suite: **14 unit + 6 integration = 20 tests, all pass**.
 
 **Local / single dev.** Follow [Installation](#installation). Run `uvicorn app_jwt:app` and `keepalive.py` as background processes.
 
-**GitHub Codespaces.** `.devcontainer/` auto-installs deps. After Codespace boot, run the same `uvicorn` command; port 8000 forwards automatically.
+**GitHub Codespaces.** `.devcontainer/` installs dependencies from `gen-ai-project/starburst-mcp2/requirements.txt` and forwards port `8001`. After the Codespace boots, configure `.env`, then run:
+
+```bash
+cd gen-ai-project/starburst-mcp2
+python -m uvicorn app_jwt:app --host 0.0.0.0 --port 8001
+```
 
 **Server / container** (not yet provided as image — build your own):
 
@@ -359,9 +399,8 @@ Current suite: **14 unit + 6 integration = 20 tests, all pass**.
 FROM python:3.12-slim
 WORKDIR /app
 COPY . .
-RUN pip install -r "gen-ai-project/starburst-mcp2/requirements.txt" \
-                 fastapi "uvicorn[standard]" openpyxl python-multipart
-CMD ["python", "-m", "uvicorn", "app_jwt:app", "--host", "0.0.0.0", "--port", "8000", \
+RUN pip install -r "gen-ai-project/starburst-mcp2/requirements.txt"
+CMD ["python", "-m", "uvicorn", "app_jwt:app", "--host", "0.0.0.0", "--port", "8001", \
      "--app-dir", "gen-ai-project/starburst-mcp2"]
 ```
 
