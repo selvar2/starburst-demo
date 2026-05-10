@@ -176,3 +176,179 @@ bash .devcontainer/sync-marketplace.sh
 
 ### Pending Enhancement (Identified, Not Yet Implemented)
 - **Chip disambiguation for same table name across schemas/catalogs:** Current chips show "Show all data from demo" — if multiple schemas/catalogs have a table named `demo`, the chip text is ambiguous. Enhancement needed: include `catalog.schema` in the chip label (e.g., "Show all data from mcp2ohio.test_writes.demo") so the NL→SQL translation can correctly resolve the fully-qualified table name. This was identified by the user via IDE selection at end of session.
+
+---
+
+# Compaction Summary — 2026-05-10
+
+**Branch:** `dev6-cp-dev3` (based on `dev3@db6bb19`)
+**Repo:** `starburst-mcp6/gen-ai-project/starburst-mcp2`
+
+## Primary Request and Intent
+
+Extend the FastAPI chatbot at `/api/chat` (in `app_jwt.py`) to support natural-language input for both technical users (raw SQL) and non-technical / business users (NL phrasings). Each phase added support for a specific operation:
+
+- Initial: Read project files, diagnose backend connection failure, restart app cleanly
+- Path renames after folder rename `gen ai project/` → `gen-ai-project/`
+- Compare `dev3` vs `dev6-cp-dev3` branches, fresh-clone `dev3`
+- Add NL DDL/DML support generally
+- Add business-user NL **INSERT** grammar
+- Add business-user NL **UPDATE** grammar
+- Push to GitHub `dev6-cp-dev3` branch
+- Add business-user NL **DELETE** grammar (destructive, confirm-gated)
+- Add business-user NL **TRUNCATE** grammar (destructive, confirm-gated)
+- Add business-user NL **DROP TABLE** grammar (destructive, confirm-gated)
+- Add business-user NL **CREATE SCHEMA / DROP SCHEMA / CREATE TABLE** (DDL)
+
+**Cross-cutting requirements:**
+- Every code change must have a timestamped backup with header comments (why/before/after/restore)
+- All changes logged to both `starburst-mcp2-session.md` and `session-2026-05-09.md`
+- No guessing on missing object context; FQ `catalog.schema.table` required
+- Destructive ops gated by `requires_confirm:true` until `context.confirm:true`
+- Preserve all existing technical-user SQL forms
+- Use throwaway tables for live validation, never real data
+
+## Key Technical Concepts
+
+- FastAPI chatbot at `/api/chat` with Pydantic models (`ChatRequest`, `QueryRequest`, `ExportRequest`)
+- Starburst Galaxy + Trino DBAPI via `StarburstClientJWT` (headless OAuth2; monkey-patches `webbrowser.open`)
+- `PermissionManager` with YAML config (profiles: `read_only`, `analyst`, `engineer`, `admin`; developer overrides)
+- Regex-based NL→SQL parsing in `_nl_to_sql(message, catalog, schema)`
+- Destructive-confirm gate via `_enforce_destructive_confirm` and `context.confirm: true`
+- FQ validation via `_validate_fq` and `StarburstClient.validate_identifier`
+- Type whitelist `_TYPE_MAP` for CREATE TABLE column types
+- Paren-aware comma splitter `_split_top_level_commas` for sized types
+- Trigger-regex pattern: each NL operation has its own `_NL_<OP>_TRIGGER` regex; dispatch order matters
+- Backup files in `gen-ai-project/starburst-mcp2/backup/app_jwt.<TS>.bak.py` with header comments
+- Git workflow on branch `dev6-cp-dev3` based on `dev3@db6bb19`
+
+## Files and Code Sections
+
+### `gen-ai-project/starburst-mcp2/app_jwt.py` (main file, all NL parsers)
+
+- Imports: `os`, `PermissionManager`. Module init: `client = StarburstClient()`, `_perms = PermissionManager()`, `_developer = os.getenv("STARBURST_DEVELOPER", "unknown")`
+- Exceptions: `FQValidationError`, `PermissionDenied`, `ConfirmRequired`
+- `_DESTRUCTIVE_PERMS = {"drop_table", "drop_schema", "truncate", "delete"}`
+- `_classify_sql(sql)` returns `(op_label, perm_key)` from `_CLASSIFY_PREFIXES` list
+- `_validate_fq(sql, op_label)` extracts target via per-op `_TARGET_PATTERNS`, requires 3-part FQ (or 2-part for CREATE/DROP SCHEMA)
+- `_check_permission(perm_key)` uses `PermissionManager.check_with_message`
+- `_enforce_destructive_confirm(perm_key, op_label, target, confirm)` raises `ConfirmRequired` for destructive ops without confirm
+
+**Business-user NL parsers** (in dispatch order in `_nl_to_sql`):
+
+| Trigger | Parser | Output |
+|---|---|---|
+| `_NL_INSERT_TRIGGER` | `_nl_insert_to_sql(message)` | INSERT INTO with `_render_value` for type coercion |
+| `_NL_UPDATE_TRIGGER` | `_nl_update_to_sql(message)` | uses `_SET_PAIR_RE`, `_CHANGE_PAIR_RE`, `_WHERE_RE`; mandatory WHERE |
+| `_NL_DROP_TABLE_TRIGGER` | `_nl_drop_table_to_sql(message)` | DROP TABLE FQ |
+| `_NL_DROP_SCHEMA_TRIGGER` | `_nl_drop_schema_to_sql(message)` | DROP SCHEMA cat.sch |
+| `_NL_CREATE_SCHEMA_TRIGGER` | `_nl_create_schema_to_sql(message)` | CREATE SCHEMA cat.sch |
+| `_NL_CREATE_TABLE_TRIGGER` | `_nl_create_table_to_sql(message)` | uses `_TYPE_MAP`, `_normalize_col_type`, `_split_top_level_commas` |
+| `_NL_DELETE_TRIGGER` | `_nl_delete_to_sql(message)` | mandatory WHERE |
+| `_NL_TRUNCATE_TRIGGER` | `_nl_truncate_to_sql(message)` | TRUNCATE TABLE FQ |
+
+- `/api/chat` wraps `_nl_to_sql` in try/except for `FQValidationError`, then runs classify → validate_fq → check_permission → enforce_destructive_confirm → `_exec`
+- `_exec` normalizes `rows_affected`/`status` for non-SELECT results
+
+### `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` (122 unit tests)
+
+- 48 tests through Phase 6 (DDL/DML general)
+- 10 tests for INSERT
+- 11 tests for UPDATE
+- 11 tests for DELETE
+- 11 tests for TRUNCATE
+- 12 tests for DROP TABLE
+- 19 tests for CREATE/DROP SCHEMA + CREATE TABLE
+
+### `starburst-mcp2-session.md` (persistent session memory, gitignored)
+BEFORE/AFTER blocks for every feature.
+
+### `session-2026-05-09.md` (3,106 lines, comprehensive session doc)
+12 Phases with full code blocks, smoke I/O, examples.
+
+### Backup files (7 total in `gen-ai-project/starburst-mcp2/backup/`)
+- `app_jwt.20260509_204843.bak.py` (NL DDL/DML general)
+- `app_jwt.20260509_232040.bak.py` (NL INSERT)
+- `app_jwt.20260509_235603.bak.py` (NL UPDATE)
+- `app_jwt.20260510_110001.bak.py` (NL DELETE)
+- `app_jwt.20260510_111719.bak.py` (NL TRUNCATE)
+- `app_jwt.20260510_113724.bak.py` (NL DROP TABLE)
+- `app_jwt.20260510_115304.bak.py` (NL CREATE/DROP SCHEMA + CREATE TABLE)
+
+Each has header comment with timestamp, source, branch, why, before, after, restore command.
+
+### Permission config (`gen-ai-project/starburst-mcp2/permissions.yaml`)
+- Developer `prakashrajr666` has `admin` profile
+- `STARBURST_DEVELOPER` env var drives `_check_permission`
+
+### Key code snippets
+
+`_TYPE_MAP` (CREATE TABLE):
+```python
+_TYPE_MAP = {
+    "int": "INTEGER", "integer": "INTEGER",
+    "bigint": "BIGINT", "long": "BIGINT",
+    "smallint": "SMALLINT", "short": "SMALLINT", "tinyint": "TINYINT",
+    "varchar": "VARCHAR", "string": "VARCHAR", "text": "VARCHAR", "char": "CHAR",
+    "double": "DOUBLE", "float": "DOUBLE", "real": "REAL",
+    "decimal": "DECIMAL", "numeric": "DECIMAL",
+    "boolean": "BOOLEAN", "bool": "BOOLEAN",
+    "date": "DATE", "timestamp": "TIMESTAMP", "datetime": "TIMESTAMP",
+    "time": "TIME", "json": "JSON", "uuid": "UUID",
+}
+```
+
+`_split_top_level_commas`:
+```python
+def _split_top_level_commas(s: str) -> list[str]:
+    parts, buf, depth = [], [], 0
+    for ch in s:
+        if   ch == '(': depth += 1; buf.append(ch)
+        elif ch == ')': depth = max(0, depth - 1); buf.append(ch)
+        elif ch == ',' and depth == 0:
+            parts.append(''.join(buf).strip()); buf = []
+        else: buf.append(ch)
+    tail = ''.join(buf).strip()
+    if tail: parts.append(tail)
+    return [p for p in parts if p]
+```
+
+## Errors and Fixes
+
+- **Missing .env file** (initial run): `AttributeError: 'NoneType' has no attribute 'split'` at `starburst_client_jwt.py:74` because `STARBURST_HOST` was None. Fixed when user manually added `.env`.
+- **Numeric literal `1.0` triggered raw-SQL dot-passthrough** (test_nl_insert failed): Input `"insert into demo values (1, 'a', 1.0)"` had a dot in `1.0` so the existing dot-passthrough returned the raw text, bypassing INSERT NL pattern. Fixed by moving DDL/DML NL patterns ABOVE the dot-passthrough in `_nl_to_sql`.
+- **`FQValidationError` raised inside `_nl_to_sql` wasn't caught by `/api/chat`** (smokes 4&5 returned HTTP 500 instead of 400): The try/except in `/api/chat` only wrapped the classify-time validator, not the parse-time call. Fixed by wrapping `_nl_to_sql(req.message, catalog, schema)` in try/except `FQValidationError`.
+- **`_NL_INSERT_TRIGGER` "^in catalog" branch could collide with UPDATE**: Refined to require `add|insert ... row|record` verb after "in catalog" prefix.
+- **`_NL_DELETE_TRIGGER` "^in catalog/schema ... delete|remove" branch was too broad**: Would match "permanently remove the table" and route to `_nl_delete_to_sql`. Fixed by requiring `(?:row|record)` after `(?:delete|remove)` in those branches.
+- **`_NL_CREATE_TABLE_TRIGGER` had `\.\w+\.\w+` continuation that intercepted raw SQL** "CREATE TABLE <FQ> (cols)": Tightened trigger to require an NL marker (`named`, `in/on/of catalog/schema`, or `with columns`).
+- **Comma inside `decimal(10,2)`** broke column splitter: Naive `cols_text.split(',')` produced `["...varchar(100)", " price as decimal(10", "2)"]`. Fixed by adding `_split_top_level_commas()` that tracks paren depth.
+- **Auto-mode classifier blocked `Remove-Item .git -Recurse -Force` and `git checkout -B dev3 origin/dev3`**: User explicitly authorized via direct chat message ("already removed files, clone only").
+- **Background bash subshell didn't preserve cd** (uvicorn started in wrong dir, exited 127): Switched to `python -m uvicorn app_jwt:app --port 8000 --host 127.0.0.1 --app-dir "gen-ai-project/starburst-mcp2"` instead of `cd && python ...`.
+- **UnicodeEncodeError when piping JSON arrows through python on Windows** (`'charmap' codec can't encode character '→'`): Fixed by using ASCII-only characters in inline `python -c` invocations.
+
+## Problem Solving
+
+- **Solved:** Architecture decision to extend `app_jwt.py` directly rather than refactoring around shared service module (kept changes minimal, avoided premature abstraction)
+- **Solved:** Trigger collision among multiple "^in catalog ..." branches by gating each on a specific second-keyword (row/record vs. table vs. schema vs. truncate/empty/clear)
+- **Solved:** Order-dependent dispatch — DROP TABLE trigger placed BEFORE DELETE trigger in `_nl_to_sql` so "permanently remove the table" doesn't fall through
+- **Solved:** All destructive ops gated through existing `_enforce_destructive_confirm` reusing the same confirm protocol
+- **Solved:** Live cluster validation done with throwaway `scratch_table*` / `scratch_sch*` objects, all dropped at end (never real data)
+
+## Current Work (Phase 12 — most recent feature)
+
+The user's most recent feature task was implementing business-user NL grammar for three DDL operations: `CREATE SCHEMA`, `DROP SCHEMA`, and `CREATE TABLE`. This was completed end-to-end:
+
+- Backed up `app_jwt.py` to `gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_115304.bak.py`
+- Added `_TYPE_MAP` (15 type aliases), `_normalize_col_type()`, `_split_top_level_commas()`
+- Added 3 triggers + 3 parsers, wired between DROP TABLE and DELETE in `_nl_to_sql`
+- Fixed 2 implementation bugs: comma split inside `decimal(10,2)` and CREATE TABLE trigger intercepting raw SQL
+- All 122 NL unit tests pass; 136 unit total + 6 integration
+- 9 live HTTP smokes against throwaway `scratch_sch` / `scratch_sch_2` / `scratch_table` / `scratch_dev` (all dropped at end)
+- Logged AFTER state to both `starburst-mcp2-session.md` and `session-2026-05-09.md` (Phase 12 section)
+- Server live at `http://127.0.0.1:8000/`, returned HTTP 200
+- File sizes: `session-2026-05-09.md` = 3,106 lines; `starburst-mcp2-session.md` = 1,041 lines
+
+## Pending Tasks / Optional Next Step
+
+- **Push Phases 10–12** (TRUNCATE, DROP TABLE, CREATE/DROP SCHEMA, CREATE TABLE) to the `dev6-cp-dev3` branch on GitHub. Only Phase 9 and earlier was pushed in commit `bc67ed4`. Phases 10–12 are uncommitted/unpushed locally.
+- No explicitly pending feature requests — the user's most recent feature request (Phase 12 DDL) was completed.

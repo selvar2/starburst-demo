@@ -48,11 +48,18 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .tree-item{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:.825rem;transition:background .15s;color:var(--text)}
 .tree-item:hover{background:var(--surface2)}
 .tree-item .icon{font-size:.75rem;color:var(--muted);width:16px;text-align:center;flex-shrink:0}
+.tree-item .label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tree-item.catalog .icon{color:var(--accent1)}
 .tree-item.schema-node .icon{color:var(--accent2)}
 .tree-item.table .icon{color:var(--accent3)}
+.tree-item.column{padding:4px 8px;font-size:.78rem;color:var(--text)}
+.tree-item.column .icon{color:var(--muted)}
+.tree-item.column .col-type{font-size:.7rem;color:var(--muted);font-style:italic;text-transform:lowercase;flex-shrink:0;margin-left:8px;opacity:.85}
+.tree-item .row-action{opacity:0;color:var(--muted);font-size:.75rem;padding:0 4px;border-radius:4px;flex-shrink:0;transition:opacity .15s,color .15s}
+.tree-item:hover .row-action{opacity:1}
+.tree-item .row-action:hover{color:var(--accent1);background:var(--surface3)}
 .tree-children{padding-left:16px;overflow:hidden;transition:max-height .3s;max-height:0}
-.tree-children.open{max-height:2000px}
+.tree-children.open{max-height:6000px}
 .sidebar-bottom{padding:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .theme-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;color:var(--muted)}
 .toggle-track{width:44px;height:24px;border-radius:12px;background:var(--surface3);position:relative;transition:background .2s}
@@ -303,18 +310,40 @@ function fetchSchema(force){
   });
 }
 
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;").replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escText(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
 function renderSchema(data){
   const el=document.getElementById('schemaBrowser');
   if(!data||!data.schemas||!data.schemas.length){el.innerHTML='<div style="padding:16px;color:var(--muted);font-size:.8rem">No schemas found.</div>';return}
   let h='';
   // Group by catalog if present, else flat
   const catalog='mcp2ohio';
-  h+=`<div class="tree-item catalog" onclick="toggleTree(this)"><span class="icon">&#9671;</span><strong>${catalog}</strong></div><div class="tree-children open">`;
+  const ca=escAttr(catalog),ct=escText(catalog);
+  h+=`<div class="tree-item catalog" onclick="toggleTree(this)"><span class="icon">&#9671;</span><strong class="label">${ct}</strong></div><div class="tree-children open">`;
   data.schemas.forEach(s=>{
-    h+=`<div class="tree-item schema-node" onclick="toggleTree(this)"><span class="icon">&#9655;</span>${s.name}</div><div class="tree-children">`;
+    const sa=escAttr(s.name),st=escText(s.name);
+    h+=`<div class="tree-item schema-node" onclick="toggleTree(this)"><span class="icon">&#9655;</span><span class="label">${st}</span></div><div class="tree-children">`;
     (s.tables||[]).forEach(t=>{
       const tn=typeof t==='string'?t:t.name;
-      h+=`<div class="tree-item table" onclick="insertTableQuery('${catalog}','${s.name}','${tn}')"><span class="icon">&#9638;</span>${tn}</div>`;
+      const cols=(typeof t==='object'&&Array.isArray(t.columns))?t.columns:[];
+      const ta=escAttr(tn),tt=escText(tn);
+      h+=`<div class="tree-item table" onclick="toggleTree(this)" title="Click to expand columns">`
+        +`<span class="icon">&#9655;</span>`
+        +`<span class="label">${tt}</span>`
+        +`<span class="row-action" title="Insert SELECT * for this table" onclick="event.stopPropagation();insertTableSelectAll('${ca}','${sa}','${ta}')">&#9656;</span>`
+        +`</div><div class="tree-children">`;
+      cols.forEach(c=>{
+        const cn=c&&c.name?c.name:'';
+        const ctype=c&&c.type?c.type:'';
+        const cna=escAttr(cn),cnt=escText(cn),ctt=escText(ctype);
+        h+=`<div class="tree-item column" title="Click to query this column" onclick="insertColumnQuery('${ca}','${sa}','${ta}','${cna}')">`
+          +`<span class="icon">&#11036;</span>`
+          +`<span class="label">${cnt}</span>`
+          +`<span class="col-type">${ctt}</span>`
+          +`</div>`;
+      });
+      h+=`</div>`;
     });
     h+=`</div>`;
   });
@@ -331,11 +360,25 @@ function toggleTree(el){
   }
 }
 
-function insertTableQuery(catalog,schema,table){
+function _setEditor(sql){
   const input=document.getElementById('chatInput');
-  input.value=`SELECT * FROM ${catalog}.${schema}.${table} LIMIT 100`;
+  if(!input) return;
+  input.value=sql;
   input.focus();
-  autoResize(input);
+  if(typeof autoResize==='function') autoResize(input);
+}
+
+function insertTableQuery(catalog,schema,table){
+  // Backward-compat: kept for any callers.
+  insertTableSelectAll(catalog,schema,table);
+}
+
+function insertTableSelectAll(catalog,schema,table){
+  _setEditor(`SELECT * FROM "${catalog}"."${schema}"."${table}" LIMIT 100;`);
+}
+
+function insertColumnQuery(catalog,schema,table,column){
+  _setEditor(`SELECT "${column}" FROM "${catalog}"."${schema}"."${table}" LIMIT 10;`);
 }
 
 // Theme

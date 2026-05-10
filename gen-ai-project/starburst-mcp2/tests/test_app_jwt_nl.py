@@ -443,3 +443,499 @@ def test_nl_update_raw_sql_unchanged():
     )
     assert sql.upper().startswith("UPDATE MCP2OHIO.TEST_WRITES.DEMO")
     assert "WHERE ID=888" in sql.upper()
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL DELETE — happy paths
+# ---------------------------------------------------------------------------
+
+def test_nl_delete_verbose_in_catalog():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, table demo, delete the row where id = 777",
+        "any", "any",
+    )
+    assert sql == "DELETE FROM mcp2ohio.test_writes.demo WHERE id = 777"
+
+
+def test_nl_delete_remove_form():
+    sql = app_jwt._nl_to_sql(
+        "Remove the record from catalog mcp2ohio, schema test_writes, table demo where id = 888",
+        "any", "any",
+    )
+    assert sql == "DELETE FROM mcp2ohio.test_writes.demo WHERE id = 888"
+
+
+def test_nl_delete_dotted_rows_from():
+    sql = app_jwt._nl_to_sql(
+        "Delete rows from mcp2ohio.test_writes.demo where name = 'nl_test'",
+        "any", "any",
+    )
+    assert sql == "DELETE FROM mcp2ohio.test_writes.demo WHERE name = 'nl_test'"
+
+
+def test_nl_delete_compound_where():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, table demo, delete the row where id = 1 and amount > 100",
+        "any", "any",
+    )
+    assert sql == "DELETE FROM mcp2ohio.test_writes.demo WHERE id = 1 and amount > 100"
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL DELETE — rejection cases (no guessing!)
+# ---------------------------------------------------------------------------
+
+def test_nl_delete_missing_catalog_rejected():
+    # Spec example #4: only schema + table, no catalog → must reject.
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In schema test_writes, remove the row from table demo where id = 901",
+            "any", "any",
+        )
+    assert "catalog" in str(ei.value).lower()
+
+
+def test_nl_delete_missing_where_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog mcp2ohio, schema test_writes, table demo, delete the row",
+            "any", "any",
+        )
+    assert "where" in str(ei.value).lower()
+
+
+def test_nl_delete_missing_table_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog mcp2ohio, schema test_writes, delete the row where id = 1",
+            "any", "any",
+        )
+    assert "table" in str(ei.value).lower()
+
+
+def test_nl_delete_reserved_word_table_rejected():
+    with pytest.raises(app_jwt.FQValidationError):
+        app_jwt._nl_to_sql(
+            "In catalog c, schema s, table SELECT, delete the row where id = 1",
+            "any", "any",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Existing technical-user DELETE forms must still work
+# ---------------------------------------------------------------------------
+
+def test_nl_delete_simple_dev_form_still_works():
+    # The simple "delete from <bare> where ..." pattern is preserved.
+    sql = app_jwt._nl_to_sql(
+        "delete from demo where id=777",
+        "mcp2ohio", "test_writes",
+    )
+    assert sql == "DELETE FROM mcp2ohio.test_writes.demo WHERE id=777"
+
+
+def test_nl_delete_simple_dev_rows_form_still_works():
+    sql = app_jwt._nl_to_sql(
+        "delete rows from demo where name='nl_test'",
+        "mcp2ohio", "test_writes",
+    )
+    # Existing simple pattern auto-qualifies bare names.
+    assert "DELETE FROM" in sql.upper() and "demo" in sql and "WHERE name='nl_test'" in sql
+
+
+def test_nl_delete_raw_sql_unchanged():
+    sql = app_jwt._nl_to_sql(
+        "DELETE FROM mcp2ohio.test_writes.demo WHERE id=901",
+        "any", "any",
+    )
+    assert sql.upper().startswith("DELETE FROM MCP2OHIO.TEST_WRITES.DEMO")
+    assert "WHERE ID=901" in sql.upper()
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL TRUNCATE — happy paths
+# ---------------------------------------------------------------------------
+
+def test_nl_truncate_in_catalog_form():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, truncate table scratch_table",
+        "any", "any",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_truncate_clear_all_rows():
+    sql = app_jwt._nl_to_sql(
+        "Clear all rows from table scratch_table in catalog mcp2ohio, schema test_writes",
+        "any", "any",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_truncate_empty_dotted():
+    sql = app_jwt._nl_to_sql(
+        "Empty the table mcp2ohio.test_writes.scratch_table",
+        "any", "any",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_truncate_remove_all_data_bare_table():
+    sql = app_jwt._nl_to_sql(
+        "Remove all data from scratch_table in catalog mcp2ohio, schema test_writes",
+        "any", "any",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL TRUNCATE — rejection cases
+# ---------------------------------------------------------------------------
+
+def test_nl_truncate_missing_catalog_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "Clear all rows from table scratch_table in schema test_writes",
+            "any", "any",
+        )
+    assert "catalog" in str(ei.value).lower()
+
+
+def test_nl_truncate_missing_schema_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "Remove all data from scratch_table in catalog mcp2ohio",
+            "any", "any",
+        )
+    assert "schema" in str(ei.value).lower()
+
+
+def test_nl_truncate_missing_table_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog mcp2ohio, schema test_writes, truncate the data",
+            "any", "any",
+        )
+    assert "table" in str(ei.value).lower()
+
+
+def test_nl_truncate_reserved_word_table_rejected():
+    with pytest.raises(app_jwt.FQValidationError):
+        app_jwt._nl_to_sql(
+            "Empty the table c.s.SELECT",
+            "any", "any",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Existing technical-user TRUNCATE forms must still work
+# ---------------------------------------------------------------------------
+
+def test_nl_truncate_simple_dev_form_still_works():
+    sql = app_jwt._nl_to_sql(
+        "truncate scratch_table",
+        "mcp2ohio", "test_writes",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_truncate_simple_dev_table_form_still_works():
+    sql = app_jwt._nl_to_sql(
+        "truncate table scratch_table",
+        "mcp2ohio", "test_writes",
+    )
+    assert sql == "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_truncate_raw_sql_unchanged():
+    sql = app_jwt._nl_to_sql(
+        "TRUNCATE TABLE mcp2ohio.test_writes.scratch_table",
+        "any", "any",
+    )
+    assert sql.upper().startswith("TRUNCATE TABLE MCP2OHIO.TEST_WRITES.SCRATCH_TABLE")
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL DROP TABLE — happy paths
+# ---------------------------------------------------------------------------
+
+def test_nl_drop_table_in_catalog_suffix():
+    sql = app_jwt._nl_to_sql(
+        "Drop table scratch_table in catalog mcp2ohio, schema test_writes",
+        "any", "any",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_drop_table_delete_the_table():
+    sql = app_jwt._nl_to_sql(
+        "Delete the table scratch_table from schema test_writes in catalog mcp2ohio",
+        "any", "any",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_drop_table_remove_dotted():
+    sql = app_jwt._nl_to_sql(
+        "Remove table mcp2ohio.test_writes.scratch_table",
+        "any", "any",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_drop_table_permanently_remove():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, permanently remove the table scratch_table",
+        "any", "any",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_drop_table_dotted_drop_form():
+    sql = app_jwt._nl_to_sql(
+        "Drop table mcp2ohio.test_writes.scratch_table",
+        "any", "any",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL DROP TABLE — rejection cases
+# ---------------------------------------------------------------------------
+
+def test_nl_drop_table_missing_catalog_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "Delete the table scratch_table from schema test_writes",
+            "any", "any",
+        )
+    assert "catalog" in str(ei.value).lower()
+
+
+def test_nl_drop_table_missing_schema_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "Remove the table scratch_table in catalog mcp2ohio",
+            "any", "any",
+        )
+    assert "schema" in str(ei.value).lower()
+
+
+def test_nl_drop_table_reserved_word_rejected():
+    with pytest.raises(app_jwt.FQValidationError):
+        app_jwt._nl_to_sql(
+            "Remove table c.s.SELECT",
+            "any", "any",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Existing technical-user DROP TABLE forms must still work + no collision with DELETE
+# ---------------------------------------------------------------------------
+
+def test_nl_drop_table_simple_dev_form_still_works():
+    # Bare 'drop table <X>' falls through to the existing simple pattern,
+    # which auto-qualifies via defaults.
+    sql = app_jwt._nl_to_sql(
+        "drop table scratch_table",
+        "mcp2ohio", "test_writes",
+    )
+    assert sql == "DROP TABLE mcp2ohio.test_writes.scratch_table"
+
+
+def test_nl_drop_table_raw_sql_unchanged():
+    sql = app_jwt._nl_to_sql(
+        "DROP TABLE mcp2ohio.test_writes.scratch_table",
+        "any", "any",
+    )
+    assert sql.upper().startswith("DROP TABLE MCP2OHIO.TEST_WRITES.SCRATCH_TABLE")
+
+
+def test_nl_drop_table_does_not_intercept_delete_row():
+    # 'In catalog ... delete the row' should still go to NL DELETE, not DROP TABLE.
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, table demo, delete the row where id = 1",
+        "any", "any",
+    )
+    assert sql.upper().startswith("DELETE FROM ")
+    assert "WHERE id = 1" in sql or "WHERE ID = 1" in sql.upper()
+
+
+def test_nl_drop_table_does_not_intercept_remove_row():
+    sql = app_jwt._nl_to_sql(
+        "Remove the record from catalog mcp2ohio, schema test_writes, table demo where id = 1",
+        "any", "any",
+    )
+    assert sql.upper().startswith("DELETE FROM ")
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL CREATE SCHEMA
+# ---------------------------------------------------------------------------
+
+def test_nl_create_schema_named_form():
+    sql = app_jwt._nl_to_sql(
+        "Create a schema named scratch_sch in catalog mcp2ohio",
+        "any", "any",
+    )
+    assert sql == "CREATE SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_create_schema_in_catalog_prefix():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, create schema scratch_sch",
+        "any", "any",
+    )
+    assert sql == "CREATE SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_create_schema_dotted():
+    sql = app_jwt._nl_to_sql(
+        "Create schema mcp2ohio.scratch_sch",
+        "any", "any",
+    )
+    assert sql == "CREATE SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_create_schema_missing_catalog_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql("Create a schema named scratch_sch in catalog", "any", "any")
+    assert "catalog" in str(ei.value).lower()
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL DROP SCHEMA
+# ---------------------------------------------------------------------------
+
+def test_nl_drop_schema_from_catalog_form():
+    sql = app_jwt._nl_to_sql(
+        "Drop schema scratch_sch from catalog mcp2ohio",
+        "any", "any",
+    )
+    assert sql == "DROP SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_drop_schema_in_catalog_prefix():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, drop schema scratch_sch",
+        "any", "any",
+    )
+    assert sql == "DROP SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_drop_schema_dotted():
+    sql = app_jwt._nl_to_sql(
+        "Drop schema mcp2ohio.scratch_sch",
+        "any", "any",
+    )
+    assert sql == "DROP SCHEMA mcp2ohio.scratch_sch"
+
+
+# ---------------------------------------------------------------------------
+# Business-user NL CREATE TABLE
+# ---------------------------------------------------------------------------
+
+def test_nl_create_table_verbose_with_columns():
+    sql = app_jwt._nl_to_sql(
+        "In catalog mcp2ohio, schema test_writes, create table scratch_table "
+        "with columns id as integer and label as varchar",
+        "any", "any",
+    )
+    assert sql == (
+        "CREATE TABLE mcp2ohio.test_writes.scratch_table (id INTEGER, label VARCHAR)"
+    )
+
+
+def test_nl_create_table_named_form():
+    sql = app_jwt._nl_to_sql(
+        "Create a table named scratch_table in catalog mcp2ohio, schema test_writes "
+        "with columns id as integer, label as varchar, amount as decimal",
+        "any", "any",
+    )
+    assert sql == (
+        "CREATE TABLE mcp2ohio.test_writes.scratch_table "
+        "(id INTEGER, label VARCHAR, amount DECIMAL)"
+    )
+
+
+def test_nl_create_table_with_size_suffix():
+    sql = app_jwt._nl_to_sql(
+        "In catalog c, schema s, create table t with columns "
+        "name as varchar(100), price as decimal(10,2)",
+        "any", "any",
+    )
+    assert sql == "CREATE TABLE c.s.t (name VARCHAR(100), price DECIMAL(10,2))"
+
+
+def test_nl_create_table_type_aliases():
+    sql = app_jwt._nl_to_sql(
+        "In catalog c, schema s, create table t with columns "
+        "a as int, b as string, c as bool, d as datetime",
+        "any", "any",
+    )
+    assert sql == "CREATE TABLE c.s.t (a INTEGER, b VARCHAR, c BOOLEAN, d TIMESTAMP)"
+
+
+def test_nl_create_table_missing_columns_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog mcp2ohio, schema test_writes, create table scratch_table",
+            "any", "any",
+        )
+    assert "column" in str(ei.value).lower()
+
+
+def test_nl_create_table_unknown_type_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog c, schema s, create table t with columns id as bigfloat",
+            "any", "any",
+        )
+    assert "bigfloat" in str(ei.value).lower() or "unknown" in str(ei.value).lower()
+
+
+def test_nl_create_table_missing_schema_rejected():
+    with pytest.raises(app_jwt.FQValidationError) as ei:
+        app_jwt._nl_to_sql(
+            "In catalog mcp2ohio, create table scratch_table with columns id as int",
+            "any", "any",
+        )
+    assert "schema" in str(ei.value).lower()
+
+
+def test_nl_create_table_duplicate_column_rejected():
+    with pytest.raises(app_jwt.FQValidationError):
+        app_jwt._nl_to_sql(
+            "In catalog c, schema s, create table t with columns id as int and id as varchar",
+            "any", "any",
+        )
+
+
+def test_nl_create_table_reserved_word_column_rejected():
+    with pytest.raises(app_jwt.FQValidationError):
+        app_jwt._nl_to_sql(
+            "In catalog c, schema s, create table t with columns select as int",
+            "any", "any",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Existing technical-user DDL still works
+# ---------------------------------------------------------------------------
+
+def test_nl_create_schema_simple_dev_form_still_works():
+    sql = app_jwt._nl_to_sql("create schema scratch_sch", "mcp2ohio", "test_writes")
+    assert sql == "CREATE SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_drop_schema_simple_dev_form_still_works():
+    sql = app_jwt._nl_to_sql("drop schema scratch_sch", "mcp2ohio", "test_writes")
+    assert sql == "DROP SCHEMA mcp2ohio.scratch_sch"
+
+
+def test_nl_create_table_raw_sql_unchanged():
+    sql = app_jwt._nl_to_sql(
+        "CREATE TABLE mcp2ohio.test_writes.scratch_table (id INTEGER, label VARCHAR)",
+        "any", "any",
+    )
+    assert "CREATE TABLE" in sql.upper() and "mcp2ohio" in sql

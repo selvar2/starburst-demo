@@ -1,3 +1,25 @@
+# ============================================================================
+# BACKUP: app_jwt.py
+# Timestamp:  2026-05-10T06:07:24Z (TS=20260510_113724)
+# Source:     gen-ai-project/starburst-mcp2/app_jwt.py
+# Branch:     dev6-cp-dev3 @ commit bc67ed4
+# Why:        Adding business-user NL DROP TABLE grammar — mirrors the
+#             INSERT/UPDATE/DELETE/TRUNCATE patterns. Recognizes 'delete the
+#             table', 'remove (the)? table', 'permanently remove (the)? table',
+#             '^drop table <FQ>', and '^in catalog/schema X ... drop|delete|
+#             remove|permanently-remove the table'.
+# Before:     /api/chat handled DROP TABLE only via raw SQL passthrough or the
+#             simple 'drop table <tbl>$' regex which auto-qualified bare names
+#             but failed on verbose 'drop table X in catalog Y, schema Z' suffix.
+#             DELETE trigger's '^in catalog ... delete|remove' branch was too
+#             broad — would intercept 'permanently remove the table'.
+# After:     New _nl_drop_table_to_sql() parser. Tightened DELETE trigger's
+#             '^in catalog/schema ... delete|remove' branches to require
+#             'row|record' so they no longer collide with table operations.
+#             DROP TABLE trigger placed BEFORE DELETE in the dispatch chain.
+# Restore:    cp 'gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_113724.bak.py' gen-ai-project/starburst-mcp2/app_jwt.py
+# ============================================================================
+
 # Additional dependencies: fastapi, uvicorn[standard], openpyxl, python-multipart
 
 import io
@@ -577,8 +599,8 @@ _NL_DELETE_TRIGGER = re.compile(
     r"remove\s+(?:a\s+|the\s+)?(?:row|record)\b|"
     r"delete\s+(?:a\s+|the\s+)?(?:row|record)\b|"
     r"delete\s+rows?\s+from\s+\w+\.\w+\.\w+|"
-    r"in\s+catalog\s+\w+.*?\b(?:delete|remove)\s+(?:a\s+|the\s+)?(?:row|record)\b|"
-    r"in\s+schema\s+\w+.*?\b(?:delete|remove)\s+(?:a\s+|the\s+)?(?:row|record)\b"
+    r"in\s+catalog\s+\w+.*?\b(?:delete|remove)\b|"
+    r"in\s+schema\s+\w+.*?\b(?:delete|remove)\b"
     r")",
     re.IGNORECASE | re.DOTALL,
 )
@@ -716,347 +738,6 @@ def _nl_truncate_to_sql(message: str) -> str:
     return f"TRUNCATE TABLE {fqn}"
 
 
-# ---------------------------------------------------------------------------
-# Business-user NL DROP TABLE
-#
-# Recognizes phrasings like:
-#   "Drop table <T> in catalog <C>, schema <S>"
-#   "Delete the table <T> from schema <S> in catalog <C>"
-#   "Remove table <C>.<S>.<T>"
-#   "In catalog <C>, schema <S>, permanently remove the table <T>"
-# Requires explicit catalog + schema + table (or dotted form).
-# Destructive — gated by the global confirm guard at /api/chat.
-#
-# Note: bare "drop table <X>" with no other qualifiers falls through to the
-# existing simple pattern that auto-qualifies via defaults — keeping the
-# technical-user passthrough intact.
-# ---------------------------------------------------------------------------
-
-_NL_DROP_TABLE_TRIGGER = re.compile(
-    r"^\s*(?:"
-    r"(?:delete|remove)\s+(?:a\s+|the\s+)?table\b|"
-    r"permanently\s+remove\s+(?:a\s+|the\s+)?table\b|"
-    r"in\s+(?:catalog|schema)\s+\w+.*?\b(?:drop|delete|remove|permanently\s+remove)\s+(?:the\s+)?table\b|"
-    r"drop\s+table\s+(?:\w+\.\w+\.\w+|\w+\s+in\s+(?:catalog|schema)\b)"
-    r")",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _nl_drop_table_to_sql(message: str) -> str:
-    """Parse a business-user NL drop-table and emit a fully-qualified DROP TABLE SQL.
-
-    Raises FQValidationError on missing catalog/schema/table — never guesses.
-    """
-    msg = message.strip().rstrip(".;!?")
-
-    # 1. Resolve target — find any 3-part dotted identifier first.
-    catalog = schema = table = None
-    m = re.search(
-        r'\b([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\b',
-        msg,
-    )
-    if m:
-        catalog, schema, table = m.group(1), m.group(2), m.group(3)
-    else:
-        mc = re.search(r'\bcatalog\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        ms = re.search(r'\bschema\s+([a-zA-Z_]\w*)',  msg, re.IGNORECASE)
-        catalog = mc.group(1) if mc else None
-        schema  = ms.group(1) if ms else None
-        # Prefer 'table X' phrase first; fall back to 'remove/drop/delete X' for
-        # forms like 'drop table scratch_table in catalog ..., schema ...'.
-        mt = re.search(r'\btable\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        if mt:
-            table = mt.group(1)
-
-    missing = [n for n, v in (("catalog", catalog), ("schema", schema), ("table", table)) if not v]
-    if missing:
-        raise FQValidationError(
-            "Could not resolve " + ", ".join(missing) + " for natural-language drop-table. "
-            "Specify all three explicitly, e.g. "
-            "'drop table scratch_table in catalog mcp2ohio, schema test_writes' "
-            "— or use the dotted form 'remove table mcp2ohio.test_writes.scratch_table'."
-        )
-
-    for part in (catalog, schema, table):
-        try:
-            StarburstClient.validate_identifier(part)
-        except ValueError as e:
-            raise FQValidationError(str(e))
-
-    fqn = f"{catalog}.{schema}.{table}"
-    return f"DROP TABLE {fqn}"
-
-
-# ---------------------------------------------------------------------------
-# Business-user NL DDL: CREATE SCHEMA / DROP SCHEMA / CREATE TABLE
-# ---------------------------------------------------------------------------
-
-# Whitelist of accepted column types. Maps natural-language token to Trino type.
-# Unknown types are rejected before any SQL runs.
-_TYPE_MAP = {
-    "int": "INTEGER", "integer": "INTEGER",
-    "bigint": "BIGINT", "long": "BIGINT",
-    "smallint": "SMALLINT", "short": "SMALLINT",
-    "tinyint": "TINYINT",
-    "varchar": "VARCHAR", "string": "VARCHAR", "text": "VARCHAR",
-    "char": "CHAR",
-    "double": "DOUBLE", "float": "DOUBLE", "real": "REAL",
-    "decimal": "DECIMAL", "numeric": "DECIMAL",
-    "boolean": "BOOLEAN", "bool": "BOOLEAN",
-    "date": "DATE",
-    "timestamp": "TIMESTAMP", "datetime": "TIMESTAMP",
-    "time": "TIME",
-    "json": "JSON",
-    "uuid": "UUID",
-}
-
-
-def _normalize_col_type(raw: str) -> str:
-    """Resolve a NL type token (with optional size suffix) against _TYPE_MAP.
-
-    Examples:
-        'integer'       -> 'INTEGER'
-        'varchar'       -> 'VARCHAR'
-        'varchar(100)'  -> 'VARCHAR(100)'
-        'decimal(10,2)' -> 'DECIMAL(10,2)'
-    Raises FQValidationError on unknown types.
-    """
-    raw = raw.strip()
-    m = re.match(r'^([a-zA-Z]+)(\s*\((\d+(?:\s*,\s*\d+)?)\))?$', raw)
-    if not m:
-        raise FQValidationError(f"Could not parse column type: '{raw}'")
-    base = m.group(1).lower()
-    size = (m.group(2) or "").replace(" ", "")
-    if base not in _TYPE_MAP:
-        accepted = ", ".join(sorted(set(_TYPE_MAP.values())))
-        raise FQValidationError(
-            f"Unknown column type '{base}'. Accepted: {accepted}"
-        )
-    return _TYPE_MAP[base] + size
-
-
-# ---- CREATE SCHEMA ---------------------------------------------------------
-
-_NL_CREATE_SCHEMA_TRIGGER = re.compile(
-    r"^\s*(?:"
-    # 'create (a)? schema named X' (verbose form)
-    r"create\s+(?:a\s+)?schema\s+named\b|"
-    # 'create (a)? schema X.Y' (dotted) or '... in/on/of catalog ...'
-    r"create\s+(?:a\s+)?schema\s+\w+(?:\.\w+|\s+(?:in|on|of)\s+catalog\b)|"
-    # '^in catalog Y, create (a)? schema'
-    r"in\s+catalog\s+\w+.*?\bcreate\s+(?:a\s+)?schema\b"
-    r")",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _nl_create_schema_to_sql(message: str) -> str:
-    """Parse a business-user NL create-schema and emit `CREATE SCHEMA <C>.<S>`."""
-    msg = message.strip().rstrip(".;!?")
-
-    # Try inline dotted form first.
-    catalog = sch_name = None
-    m = re.search(
-        r'\bschema\s+(?:named\s+)?([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\b',
-        msg, re.IGNORECASE,
-    )
-    if m:
-        catalog, sch_name = m.group(1), m.group(2)
-    else:
-        mc = re.search(r'\bcatalog\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        ms = re.search(r'\bschema\s+(?:named\s+)?([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        catalog = mc.group(1) if mc else None
-        sch_name = ms.group(1) if ms else None
-
-    missing = [n for n, v in (("catalog", catalog), ("schema name", sch_name)) if not v]
-    if missing:
-        raise FQValidationError(
-            "Could not resolve " + ", ".join(missing) + " for natural-language create-schema. "
-            "Specify both, e.g. 'create schema scratch_sch in catalog mcp2ohio' "
-            "— or use the dotted form 'create schema mcp2ohio.scratch_sch'."
-        )
-
-    for part in (catalog, sch_name):
-        try:
-            StarburstClient.validate_identifier(part)
-        except ValueError as e:
-            raise FQValidationError(str(e))
-
-    return f"CREATE SCHEMA {catalog}.{sch_name}"
-
-
-# ---- DROP SCHEMA ----------------------------------------------------------
-
-_NL_DROP_SCHEMA_TRIGGER = re.compile(
-    r"^\s*(?:"
-    # 'drop schema X.Y' or 'drop schema X in/from catalog ...'
-    r"drop\s+schema\s+\w+(?:\.\w+|\s+(?:in|from|of)\s+catalog\b)|"
-    # '^in catalog Y, drop schema'
-    r"in\s+catalog\s+\w+.*?\bdrop\s+schema\b"
-    r")",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _nl_drop_schema_to_sql(message: str) -> str:
-    """Parse a business-user NL drop-schema and emit `DROP SCHEMA <C>.<S>`."""
-    msg = message.strip().rstrip(".;!?")
-
-    catalog = sch_name = None
-    m = re.search(
-        r'\bschema\s+([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\b',
-        msg, re.IGNORECASE,
-    )
-    if m:
-        catalog, sch_name = m.group(1), m.group(2)
-    else:
-        mc = re.search(r'\bcatalog\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        ms = re.search(r'\bschema\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        catalog = mc.group(1) if mc else None
-        sch_name = ms.group(1) if ms else None
-
-    missing = [n for n, v in (("catalog", catalog), ("schema name", sch_name)) if not v]
-    if missing:
-        raise FQValidationError(
-            "Could not resolve " + ", ".join(missing) + " for natural-language drop-schema. "
-            "Specify both, e.g. 'drop schema scratch_sch in catalog mcp2ohio' "
-            "— or use the dotted form 'drop schema mcp2ohio.scratch_sch'."
-        )
-
-    for part in (catalog, sch_name):
-        try:
-            StarburstClient.validate_identifier(part)
-        except ValueError as e:
-            raise FQValidationError(str(e))
-
-    return f"DROP SCHEMA {catalog}.{sch_name}"
-
-
-# ---- CREATE TABLE ---------------------------------------------------------
-
-_NL_CREATE_TABLE_TRIGGER = re.compile(
-    r"^\s*(?:"
-    # 'create (a)? table named X' (verbose form)
-    r"create\s+(?:a\s+)?table\s+named\b|"
-    # 'create (a)? table X in/on/of catalog/schema ...' (verbose suffix)
-    r"create\s+(?:a\s+)?table\s+\w+\s+(?:in|on|of)\s+(?:catalog|schema)\b|"
-    # 'create (a)? table X ... with columns ...' (NL columns marker)
-    r"create\s+(?:a\s+)?table\s+\w+.*?\bwith\s+columns?\b|"
-    # '^in catalog Y, create (a)? table'
-    r"in\s+catalog\s+\w+.*?\bcreate\s+(?:a\s+)?table\b"
-    r")",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _split_top_level_commas(s: str) -> list[str]:
-    """Split on commas that are NOT nested inside parentheses.
-
-    Used so 'varchar(100), decimal(10,2)' splits into 2 items, not 3.
-    """
-    parts: list[str] = []
-    buf: list[str] = []
-    depth = 0
-    for ch in s:
-        if ch == '(':
-            depth += 1
-            buf.append(ch)
-        elif ch == ')':
-            depth = max(0, depth - 1)
-            buf.append(ch)
-        elif ch == ',' and depth == 0:
-            parts.append(''.join(buf).strip())
-            buf = []
-        else:
-            buf.append(ch)
-    tail = ''.join(buf).strip()
-    if tail:
-        parts.append(tail)
-    return [p for p in parts if p]
-
-
-def _nl_create_table_to_sql(message: str) -> str:
-    """Parse a business-user NL create-table and emit fully-qualified CREATE TABLE SQL.
-
-    Required: catalog, schema, table, AND at least one column definition with
-    an accepted type. Raises FQValidationError on any missing/ambiguous part.
-    """
-    msg = message.strip().rstrip(".;!?")
-
-    # 1. Resolve target — try 3-part dotted first.
-    catalog = schema = table = None
-    m = re.search(
-        r'\b([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\b',
-        msg,
-    )
-    if m:
-        catalog, schema, table = m.group(1), m.group(2), m.group(3)
-    else:
-        mc = re.search(r'\bcatalog\s+([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        ms = re.search(r'\bschema\s+([a-zA-Z_]\w*)',  msg, re.IGNORECASE)
-        catalog = mc.group(1) if mc else None
-        schema  = ms.group(1) if ms else None
-        mt = re.search(r'\btable\s+(?:named\s+)?([a-zA-Z_]\w*)', msg, re.IGNORECASE)
-        if mt:
-            table = mt.group(1)
-
-    missing = [n for n, v in (("catalog", catalog), ("schema", schema), ("table", table)) if not v]
-    if missing:
-        raise FQValidationError(
-            "Could not resolve " + ", ".join(missing) + " for natural-language create-table. "
-            "Specify all three explicitly, e.g. "
-            "'in catalog mcp2ohio, schema test_writes, create table scratch_table "
-            "with columns id as integer, label as varchar'."
-        )
-
-    for part in (catalog, schema, table):
-        try:
-            StarburstClient.validate_identifier(part)
-        except ValueError as e:
-            raise FQValidationError(str(e))
-
-    # 2. Resolve column definitions. Mandatory.
-    body = re.split(r'\bwith\s+columns?\b', msg, maxsplit=1, flags=re.IGNORECASE)
-    if len(body) < 2:
-        raise FQValidationError(
-            "CREATE TABLE requires column definitions. Add a 'with columns ...' clause, "
-            "e.g. 'with columns id as integer, label as varchar'."
-        )
-    cols_text = body[1].strip().rstrip(".;,!?")
-    cols_text = re.sub(r',?\s*\band\b\s+', ', ', cols_text, flags=re.IGNORECASE)
-
-    raw_pairs = _split_top_level_commas(cols_text)
-    if not raw_pairs:
-        raise FQValidationError("No column definitions found after 'with columns'.")
-
-    pair_re = re.compile(
-        r'^([a-zA-Z_]\w*)\s+(?:as\s+)?([a-zA-Z]+(?:\s*\(\d+(?:\s*,\s*\d+)?\))?)$'
-    )
-    cols_seen: set[str] = set()
-    col_defs: list[str] = []
-    for raw in raw_pairs:
-        m = pair_re.match(raw)
-        if not m:
-            raise FQValidationError(
-                f"Could not parse column definition: '{raw}'. "
-                f"Expected '<name> as <type>' (e.g. 'id as integer')."
-            )
-        col_name = m.group(1)
-        try:
-            StarburstClient.validate_identifier(col_name)
-        except ValueError as e:
-            raise FQValidationError(str(e))
-        if col_name in cols_seen:
-            raise FQValidationError(f"Duplicate column in CREATE TABLE: '{col_name}'")
-        cols_seen.add(col_name)
-        col_type = _normalize_col_type(m.group(2))
-        col_defs.append(f"{col_name} {col_type}")
-
-    fqn = f"{catalog}.{schema}.{table}"
-    return f"CREATE TABLE {fqn} ({', '.join(col_defs)})"
-
-
 def _nl_to_sql(message: str, catalog: str, schema: str) -> str | None:
     """Return SQL string or None if no pattern matched and not raw SQL."""
     msg = message.strip()
@@ -1070,21 +751,6 @@ def _nl_to_sql(message: str, catalog: str, schema: str) -> str | None:
     # Business-user NL update — same reason.
     if _NL_UPDATE_TRIGGER.match(low):
         return _nl_update_to_sql(msg)
-
-    # Business-user NL drop-table — runs before DELETE so that "remove the table"
-    # / "in catalog ... permanently remove the table" don't fire the DELETE branch.
-    if _NL_DROP_TABLE_TRIGGER.match(low):
-        return _nl_drop_table_to_sql(msg)
-
-    # Business-user NL DDL: drop schema, create schema, create table.
-    # Each triggers on a specific second-keyword so they don't overlap with
-    # one another or with table-level operations.
-    if _NL_DROP_SCHEMA_TRIGGER.match(low):
-        return _nl_drop_schema_to_sql(msg)
-    if _NL_CREATE_SCHEMA_TRIGGER.match(low):
-        return _nl_create_schema_to_sql(msg)
-    if _NL_CREATE_TABLE_TRIGGER.match(low):
-        return _nl_create_table_to_sql(msg)
 
     # Business-user NL delete — same reason. Destructive: gated by confirm guard later.
     if _NL_DELETE_TRIGGER.match(low):

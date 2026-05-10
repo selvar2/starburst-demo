@@ -805,3 +805,283 @@ Add a record into catalog mcp2ohio, schema test_writes, table bool_demo with a 1
 | 9 | cleanup: `delete from demo where id=4242 (confirm=true)` | rows_affected=1 | ✅ |
 
 **Status:** ✅ Feature complete. uvicorn at http://127.0.0.1:8000/.
+
+---
+
+## SESSION 2026-05-10 — Business-user NL DELETE grammar
+
+### BEFORE state
+
+**Goal:** Add business-user NL DELETE grammar parallel to INSERT and UPDATE. Four target prompts:
+1. `In catalog mcp2ohio, schema test_writes, table demo, delete the row where id = 777`
+2. `Remove the record from catalog mcp2ohio, schema test_writes, table demo where id = 888`
+3. `Delete rows from mcp2ohio.test_writes.demo where name = 'nl_test'`
+4. `In schema test_writes, remove the row from table demo where id = 901`  ← intentionally missing catalog → must reject
+
+**Existing DELETE coverage:**
+- Raw SQL passthrough handles `DELETE FROM <FQ> WHERE ...`.
+- Simple NL pattern at `_nl_to_sql`: `delete\s+(?:rows?\s+)?(?:from\s+)?([\w.]+)(?:\s+where\s+(.+))?$` — handles `delete from demo where id=1`. WHERE is optional; missing WHERE generates a whole-table delete.
+- Destructive-op confirm guard already gates all DELETE ops via `_enforce_destructive_confirm` (`delete` is in `_DESTRUCTIVE_PERMS`).
+
+**Plan:**
+1. Backup app_jwt.py with timestamp + comment.
+2. Add `_NL_DELETE_TRIGGER` (matches `^remove ... row|record`, `^delete ... row|record`, `^delete rows? from <FQ>`, `^in catalog ... delete|remove`, `^in schema ... delete|remove`).
+3. Add `_nl_delete_to_sql(message)`:
+   - Resolve target via inline dotted form OR verbose `catalog/schema/table` phrases.
+   - WHERE clause **mandatory** — reject if missing.
+   - Validate identifiers; emit `DELETE FROM <FQ> WHERE <cond>`.
+4. Wire into `_nl_to_sql` after the UPDATE trigger.
+5. Tests for happy paths + rejection cases + existing-pattern preservation.
+6. Restart uvicorn and smoke-test via confirm flow.
+
+**Existing safeguards retained:**
+- Destructive-confirm gate (`requires_confirm:true` until `context.confirm=true`).
+- Permission check via `PermissionManager.check_with_message(_developer, "delete")`.
+- FQ validator at /api/chat layer.
+
+### AFTER state (DELETE feature complete)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_NL_DELETE_TRIGGER`, `_nl_delete_to_sql()`; wired into `_nl_to_sql` after the UPDATE trigger. Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_110001.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 11 DELETE-specific tests.
+
+**Tests:** 94 unit pass (11 new + 83 prior). 0 failures.
+
+**Live smoke tests on `/api/chat`:**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| 1 | `In catalog mcp2ohio, schema test_writes, table demo, delete the row where id = 7777` (no confirm) | requires_confirm | OK requires_confirm=true, target FQ resolved |
+| 1b | same + confirm:true | rows_affected=1 | OK rows_affected=1 |
+| 2 | `Remove the record from catalog mcp2ohio, schema test_writes, table demo where id = 8888` (confirm:true) | rows_affected=1 | OK |
+| 3 | `Delete rows from mcp2ohio.test_writes.demo where name = 'del_seed_9999'` (confirm:true) | rows_affected=1 | OK |
+| 4 | `In schema test_writes, remove the row from table demo where id = 1010` (missing catalog) | HTTP 400 | OK fq_validation, "Could not resolve catalog..." |
+| 5 | `In catalog mcp2ohio, schema test_writes, table demo, delete the row` (no WHERE) | HTTP 400 | OK fq_validation, "DELETE requires a WHERE clause..." |
+| 6 | `DELETE FROM mcp2ohio.test_writes.demo WHERE id=1010` (raw SQL, confirm) | rows_affected=1 | OK unchanged behavior |
+| 7 | `delete from demo where id in (...)` (simple NL, confirm) | rows_affected=N | OK auto-qualifies, executes |
+
+**Status:** Feature complete. uvicorn at http://127.0.0.1:8000/.
+
+---
+
+## SESSION 2026-05-10 — Business-user NL TRUNCATE grammar
+
+### BEFORE state
+
+**Goal:** Add business-user NL TRUNCATE grammar. Four target prompts:
+1. `In catalog mcp2ohio, schema test_writes, truncate table scratch_table`
+2. `Clear all rows from table scratch_table in catalog mcp2ohio, schema test_writes`
+3. `Empty the table mcp2ohio.test_writes.scratch_table`
+4. `Remove all data from scratch_table in catalog mcp2ohio, schema test_writes`
+
+**Existing TRUNCATE coverage:**
+- Raw SQL passthrough: `TRUNCATE TABLE <FQ>`.
+- Simple NL pattern: `truncate\s+(?:table\s+)?([\w.]+)$` — auto-qualifies bare names.
+- Destructive-confirm gate already applies (`truncate` is in `_DESTRUCTIVE_PERMS`).
+
+**Plan:**
+1. Backup app_jwt.py with timestamp.
+2. Add `_NL_TRUNCATE_TRIGGER` matching `clear all rows from`, `empty (the)? table`, `remove all data|rows from`, and `^in catalog ... truncate|empty|clear`.
+3. Add `_nl_truncate_to_sql(message)` that resolves catalog/schema/table from inline dotted OR verbose phrases (with fallback for "from <bare>" when no "table X" phrase present), validates identifiers, returns `TRUNCATE TABLE <FQ>`.
+4. Wire into `_nl_to_sql` after DELETE trigger.
+5. Tests for happy paths + rejections.
+6. Live smoke against a throwaway `mcp2ohio.test_writes.scratch_table` (create → truncate → drop, no real data touched).
+7. Log AFTER.
+
+**Safety:** mandatory FQ resolution. Existing simple pattern preserved. All TRUNCATE ops still gated by `requires_confirm:true` until `context.confirm:true`.
+
+### AFTER state (TRUNCATE feature complete)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_NL_TRUNCATE_TRIGGER`, `_nl_truncate_to_sql()`. Wired into `_nl_to_sql` after the DELETE trigger. Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_111719.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 11 TRUNCATE-specific tests.
+
+**Tests:** 105 unit pass (11 new + 94 prior). 0 failures.
+
+**Live smoke tests (throwaway scratch_table only — no real data touched):**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| Setup A | `CREATE TABLE mcp2ohio.test_writes.scratch_table (id INTEGER, label VARCHAR)` | created | OK |
+| Setup B | seed 3 rows via NL INSERT | rows=3 | OK [[3]] |
+| 1 | `In catalog mcp2ohio, schema test_writes, truncate table scratch_table` (no confirm) | requires_confirm=true | OK requires_confirm + target FQ + WARNING msg |
+| 1b | same + confirm:true | 3 rows -> 0 rows | OK after-truncate count [[0]] |
+| 2 | `Clear all rows from table scratch_table in catalog mcp2ohio, schema test_writes` (confirm) | TRUNCATE FQ | OK |
+| 3 | `Empty the table mcp2ohio.test_writes.scratch_table` (confirm) | TRUNCATE FQ | OK |
+| 4 | `Remove all data from scratch_table in catalog mcp2ohio, schema test_writes` (confirm) | TRUNCATE FQ | OK |
+| 5 | missing catalog form | HTTP 400 | OK fq_validation |
+| 6 | missing schema form | HTTP 400 | OK fq_validation |
+| 7 | dev SQL `truncate table mcp2ohio.test_writes.scratch_table` (confirm) | TRUNCATE FQ | OK unchanged |
+| Cleanup | `DROP TABLE mcp2ohio.test_writes.scratch_table` (confirm) | dropped | OK |
+
+**Status:** Feature complete. uvicorn at http://127.0.0.1:8000/. No real-data tables touched.
+
+---
+
+## SESSION 2026-05-10 — Business-user NL DROP TABLE grammar
+
+### BEFORE state
+
+**Goal:** Add business-user NL DROP TABLE grammar. Four target prompts:
+1. `Drop table scratch_table in catalog mcp2ohio, schema test_writes`
+2. `Delete the table scratch_table from schema test_writes in catalog mcp2ohio`
+3. `Remove table mcp2ohio.test_writes.scratch_table`
+4. `In catalog mcp2ohio, schema test_writes, permanently remove the table scratch_table`
+
+**Existing DROP TABLE coverage:**
+- Raw SQL passthrough: `DROP TABLE <FQ>`.
+- Simple NL pattern: `drop\s+table\s+([\w.]+)$` — auto-qualifies bare names; `$` anchor means it fails on verbose forms with "in catalog X, schema Y" suffix.
+- Destructive-confirm gate already applies (`drop_table` is in `_DESTRUCTIVE_PERMS`).
+
+**Trigger collision risk:** existing DELETE trigger's `^in catalog ... delete|remove` branch matches "permanently remove" and would route example #4 to `_nl_delete_to_sql` (which would then fail expecting a WHERE clause). Same for the `^in schema ...` branch.
+
+**Plan:**
+1. Backup app_jwt.py with timestamp.
+2. **Tighten** the existing DELETE trigger's `^in catalog/schema ... (delete|remove)` branches to require `row|record` after the verb, so they only match DML phrasings.
+3. Add `_NL_DROP_TABLE_TRIGGER` matching:
+   - `^(delete|remove) (a|the)? table`
+   - `^permanently remove (the)? table`
+   - `^in (catalog|schema) ... (drop|delete|remove|permanently remove) (the)? table`
+   - `^drop table <FQ>` and `^drop table <bare> in (catalog|schema)`
+   - The bare `^drop table <bare>$` form is left to the existing simple pattern.
+4. Add `_nl_drop_table_to_sql(message)` — parallel to `_nl_truncate_to_sql`. Resolves catalog/schema/table from inline dotted OR verbose phrases, validates identifiers, returns `DROP TABLE <FQ>`.
+5. Wire into `_nl_to_sql` BEFORE the DELETE trigger.
+6. Tests for happy paths + rejections + dev-SQL preservation.
+7. Live smoke against a throwaway `mcp2ohio.test_writes.scratch_table` (create → drop, no real data touched).
+8. Log AFTER.
+
+### AFTER state (DROP TABLE feature complete)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_NL_DROP_TABLE_TRIGGER`, `_nl_drop_table_to_sql()`. Tightened `_NL_DELETE_TRIGGER`'s `^in catalog/schema ... delete|remove` branches to require `row|record` (collision fix). Wired DROP TABLE check **before** DELETE in `_nl_to_sql`. Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_113724.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 12 DROP TABLE tests including 2 collision-regression tests for DELETE phrasings.
+
+**Tests:** 117 unit pass (12 new + 105 prior). 0 failures.
+
+**Live smoke tests (throwaway scratch_table_drop only — no real data touched):**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| Setup | `CREATE TABLE mcp2ohio.test_writes.scratch_table_drop (id INTEGER, label VARCHAR)` | created | OK |
+| 1 | `Drop table scratch_table_drop in catalog mcp2ohio, schema test_writes` (no confirm) | requires_confirm=true | OK target FQ resolved |
+| 2 | `Delete the table scratch_table_drop from schema test_writes in catalog mcp2ohio` (confirm) | DROP executed | OK; show_tables confirms scratch_table_drop is gone |
+| 3 | `Remove table mcp2ohio.test_writes.scratch_table_drop` (recreated, confirm) | DROP executed | OK |
+| 4 | `In catalog mcp2ohio, schema test_writes, permanently remove the table scratch_table_drop` (recreated, confirm) | DROP executed | OK |
+| 5 | missing catalog form | HTTP 400 | OK fq_validation, "Could not resolve catalog..." |
+| 6 | missing schema form | HTTP 400 | OK fq_validation, "Could not resolve schema..." |
+| 7 | dev SQL `DROP TABLE <FQ>` (recreated, confirm) | DROP executed | OK unchanged |
+| 8 | regression: `In catalog ... delete the row where id=-999` | routes to DELETE not DROP | OK operation=DELETE, requires_confirm=true |
+
+**Status:** Feature complete. uvicorn at http://127.0.0.1:8000/. Throwaway table created → dropped multiple times during validation; final `show tables` confirms it is gone. No real-data tables touched.
+
+---
+
+## SESSION 2026-05-10 — Business-user NL DDL: CREATE SCHEMA / DROP SCHEMA / CREATE TABLE
+
+### BEFORE state
+
+**Goal:** Add NL grammars for three DDL ops. Five target prompts:
+1. `Create a schema named scratch_sch in catalog mcp2ohio` → `CREATE SCHEMA mcp2ohio.scratch_sch`
+2. `In catalog mcp2ohio, create schema scratch_sch` → same
+3. `Drop schema scratch_sch from catalog mcp2ohio` → `DROP SCHEMA mcp2ohio.scratch_sch` (destructive — confirm gate)
+4. `Create a table named scratch_table in catalog mcp2ohio, schema test_writes` → fails (no columns) or supports defaults
+5. `In catalog mcp2ohio, schema test_writes, create table scratch_table with columns id as integer and label as varchar` → `CREATE TABLE mcp2ohio.test_writes.scratch_table (id INTEGER, label VARCHAR)`
+
+**Existing coverage:**
+- Raw SQL passthrough handles `CREATE/DROP SCHEMA <FQ>` and `CREATE TABLE <FQ> (cols)`.
+- Simple NL patterns: `create schema X` and `drop schema X` (auto-qualify bare to `{catalog}.{X}`). $ anchor — fail on verbose suffix.
+- CREATE TABLE NL: **not handled** — only raw SQL.
+
+**Plan:**
+1. Backup app_jwt.py.
+2. Add `_TYPE_MAP` (whitelist of accepted column types: int/integer/bigint/varchar/string/text/double/float/decimal/boolean/date/timestamp/...).
+3. Add three trigger regexes + parsers:
+   - `_NL_CREATE_SCHEMA_TRIGGER` + `_nl_create_schema_to_sql`
+   - `_NL_DROP_SCHEMA_TRIGGER` + `_nl_drop_schema_to_sql`
+   - `_NL_CREATE_TABLE_TRIGGER` + `_nl_create_table_to_sql` (parses "with columns X as int, Y as varchar")
+4. Wire all three into `_nl_to_sql` between DROP TABLE and DELETE checks.
+5. Tests for happy paths + rejections (missing catalog, missing schema, missing columns, unknown column type, reserved-word column).
+6. Live smoke against throwaway `mcp2ohio.test_writes.scratch_*` objects (create → drop, no real data touched).
+7. Log AFTER.
+
+**Safety:**
+- Mandatory FQ resolution.
+- CREATE TABLE column types validated against `_TYPE_MAP` before SQL runs — unknown types rejected.
+- DROP SCHEMA already in `_DESTRUCTIVE_PERMS` → confirm gate applies.
+- CREATE SCHEMA / CREATE TABLE are additive — no confirm needed.
+
+### AFTER state (DDL feature complete)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_TYPE_MAP`, `_normalize_col_type`, `_split_top_level_commas`, `_NL_CREATE_SCHEMA_TRIGGER`, `_nl_create_schema_to_sql`, `_NL_DROP_SCHEMA_TRIGGER`, `_nl_drop_schema_to_sql`, `_NL_CREATE_TABLE_TRIGGER`, `_nl_create_table_to_sql`. Wired all three into `_nl_to_sql` between the DROP TABLE and DELETE checks. Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260510_115304.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 19 DDL tests.
+
+**Bug fixes during implementation:**
+1. CREATE TABLE column splitter broke on commas inside type sizes like `decimal(10,2)`. Added `_split_top_level_commas()` which tracks paren depth and only splits on top-level commas.
+2. CREATE TABLE trigger's `\.\w+\.\w+` continuation branch was matching raw SQL `CREATE TABLE <FQ> (cols)` and incorrectly routing it to NL parser. Tightened the trigger to require an NL-only marker (`named`, `in/on/of catalog/schema`, or `with columns`) so raw SQL passes through unchanged.
+
+**Tests:** 136 unit pass (19 new + 117 prior). 0 failures.
+
+**Live smoke tests (throwaway scratch_sch + scratch_table — no real data touched):**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| 1 | `Create a schema named scratch_sch in catalog mcp2ohio` | CREATE SCHEMA executed | OK rows_affected=0 |
+| 2 | `In catalog mcp2ohio, create schema scratch_sch_2` | CREATE SCHEMA executed | OK |
+| 3 | `In catalog mcp2ohio, schema scratch_sch, create table scratch_table with columns id as integer, label as varchar, and amount as decimal(10,2)` | CREATE TABLE with 3 typed cols | OK; describe shows id integer, label varchar, amount decimal(10,2) |
+| 4 | `describe scratch_table ...` (regression) | shows the columns | OK |
+| 5 | NL CREATE TABLE missing columns | HTTP 400 | OK "CREATE TABLE requires column definitions..." |
+| 6 | NL CREATE TABLE unknown type "bigfloat" | HTTP 400 | OK "Unknown column type 'bigfloat'. Accepted: BIGINT, BOOLEAN, CHAR, ..." |
+| 7 | `Drop schema scratch_sch_2 from catalog mcp2ohio` (no confirm) | requires_confirm=true | OK target FQ resolved |
+| 8 | same + confirm:true | DROP SCHEMA executed | OK rows_affected=0 |
+| Cleanup A | DROP TABLE the smoke-3 table | dropped | OK |
+| Cleanup B | DROP SCHEMA scratch_sch | dropped | OK |
+| 9 | regression: raw SQL `CREATE TABLE <FQ> (cols)` | unchanged behavior | OK CREATE TABLE executed |
+
+**Status:** Feature complete. uvicorn at http://127.0.0.1:8000/. All throwaway objects created → dropped during validation; no real data touched.
+
+---
+
+## Phase 13 — Schema browser column visibility + click-to-query (UI)
+
+### [2026-05-10] FRONTEND-ONLY change to `index.html`
+
+#### ACTION TYPE: CODE
+#### PURPOSE
+Make the left schema browser show columns with their data types under each table (matching Starburst-style behavior), and turn each column into a one-click shortcut that populates the editor with `SELECT "<col>" FROM "<cat>"."<sch>"."<tbl>" LIMIT 10;`. Preserve the prior "SELECT * for table" behavior via a hover-revealed run icon.
+
+#### BEFORE — `index.html` `renderSchema()`
+- Tree only rendered catalog → schema → table.
+- Clicking a table inserted `SELECT * FROM cat.schema.table LIMIT 100` (unquoted).
+- Columns from `_describe_table` were already in the API payload but ignored on the client.
+
+#### AFTER — `index.html`
+- New CSS classes: `.tree-item .label`, `.tree-item.column`, `.tree-item.column .col-type`, `.tree-item .row-action` (hover-revealed). `.tree-children.open` max-height bumped 2000 → 6000 to fit columns.
+- New JS helpers: `escAttr`, `escText`, `_setEditor`.
+- `renderSchema()` now nests `<div class="tree-children">` of column rows under each table; each column shows name + italic data type aligned right.
+- Table label click → `toggleTree(this)` (was: insert `SELECT *`).
+- Hover-only "▶" icon on the table row → `insertTableSelectAll(cat, sch, tbl)` → `SELECT * FROM "cat"."sch"."tbl" LIMIT 100;`.
+- Column click → `insertColumnQuery(cat, sch, tbl, col)` → `SELECT "col" FROM "cat"."sch"."tbl" LIMIT 10;`.
+- `insertTableQuery()` retained as a back-compat alias.
+
+#### NO BACKEND CHANGE
+`_describe_table` ([app_jwt.py:1252](gen-ai-project/starburst-mcp2/app_jwt.py#L1252)) already returns `{name, columns:[{name, type}]}` per table; the existing raw-SQL passthrough at [app_jwt.py:1152](gen-ai-project/starburst-mcp2/app_jwt.py#L1152) accepts double-quoted SELECT (SELECT is FQ-exempt at [app_jwt.py:171](gen-ai-project/starburst-mcp2/app_jwt.py#L171)).
+
+#### VALIDATION (live)
+| # | Check | Result |
+|---|---|---|
+| 1 | `GET /api/schema` returns `demo` columns | `[{name:id,type:integer},{name:name,type:varchar},{name:amount,type:double}]` ✓ |
+| 2 | `POST /api/chat` with `SELECT "id" FROM "mcp2ohio"."test_writes"."demo" LIMIT 10;` | HTTP 200, `cols=['id']`, 8 rows ✓ |
+| 3 | Schema endpoint shape unchanged | `{schemas:[{name, tables:[{name, columns:[{name,type}]}]}]}` ✓ |
+
+#### STATUS: SUCCESS
+Frontend-only delta. uvicorn at http://127.0.0.1:8000/ remained running across the change (no backend reload needed).
+
+#### OBSERVATIONS
+- Backend already had everything needed; the prior UI just dropped column data on the floor.
+- Catalog is still hard-coded to `mcp2ohio` in `renderSchema()` (pre-existing). Multi-catalog support would require backend to return catalog name(s).
+- `.tree-children.open` max-height is a CSS heuristic — 6000px fits realistic schemas but very wide tables × many tables could clip.
+
+#### NEXT STEP
+- Optional: surface catalog from the API instead of hard-coding `mcp2ohio` in the client.
+- Optional: push Phases 10–13 to GitHub `dev6-cp-dev3` (only Phase 9 and earlier are in commit `bc67ed4`).
