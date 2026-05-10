@@ -3,7 +3,7 @@
     "starburst-rw": {
       "command": "python3",
       "args": [
-        "./gen ai project/starburst-mcp2/server.py"
+        "./gen-ai-project/starburst-mcp2/server.py"
       ]
     }
   }

@@ -2,11 +2,11 @@
 
 ## 1. Executive Summary
 
-`app_jwt.py` is the **FastAPI backend** for StarQuery AI — a browser-based chatbot that converts natural-language prompts into Trino/SQL against **Starburst Galaxy** and renders results as tables, charts, and exports. The "JWT" suffix denotes the **headless-OAuth2** variant: no interactive browser popup, because `webbrowser.open` is monkey-patched to complete the Galaxy OAuth flow programmatically (see [`starburst_client_jwt.py`](../gen%20ai%20project/starburst-mcp2/starburst_client_jwt.py)).
+`app_jwt.py` is the **FastAPI backend** for StarQuery AI — a browser-based chatbot that converts natural-language prompts into Trino/SQL against **Starburst Galaxy** and renders results as tables, charts, and exports. The "JWT" suffix denotes the **headless-OAuth2** variant: no interactive browser popup, because `webbrowser.open` is monkey-patched to complete the Galaxy OAuth flow programmatically (see [`starburst_client_jwt.py`](../gen-ai-project/starburst-mcp2/starburst_client_jwt.py)).
 
 Audience: backend engineers extending the chatbot, adding tools, swapping the NL engine, or hardening for production.
 
-Related docs: [`README.md`](../README.md), [`STARBURST-AUTH.md`](../gen%20ai%20project/starburst-mcp2/STARBURST-AUTH.md).
+Related docs: [`README.md`](../README.md), [`STARBURST-AUTH.md`](../gen-ai-project/starburst-mcp2/STARBURST-AUTH.md).
 
 ---
 
@@ -21,8 +21,8 @@ Related docs: [`README.md`](../README.md), [`STARBURST-AUTH.md`](../gen%20ai%20p
 | Frontend export | `html2canvas` + `jsPDF` | CDN | PDF/JPEG screenshot export | Client-side rendering — no server load |
 | Web framework | FastAPI | latest | ASGI app, routing, DI, Pydantic models | Async-first, typed, auto OpenAPI |
 | ASGI server | Uvicorn | `uvicorn[standard]` | Hosts FastAPI on `:8000` | Canonical pair with FastAPI |
-| Validation | Pydantic v2 | bundled with FastAPI | `QueryRequest`, `ChatRequest`, `ExportRequest` at [`app_jwt.py:47-57`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L47-L57) | Declarative request validation |
-| Concurrency | `threading`, `concurrent.futures.ThreadPoolExecutor` | stdlib | Parallel `SHOW TABLES` + `DESCRIBE` fan-out in `_fetch_schema` [`app_jwt.py:325-367`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L325-L367) | Trino calls are I/O-bound; threads avoid GIL pain |
+| Validation | Pydantic v2 | bundled with FastAPI | `QueryRequest`, `ChatRequest`, `ExportRequest` at [`app_jwt.py:47-57`](../gen-ai-project/starburst-mcp2/app_jwt.py#L47-L57) | Declarative request validation |
+| Concurrency | `threading`, `concurrent.futures.ThreadPoolExecutor` | stdlib | Parallel `SHOW TABLES` + `DESCRIBE` fan-out in `_fetch_schema` [`app_jwt.py:325-367`](../gen-ai-project/starburst-mcp2/app_jwt.py#L325-L367) | Trino calls are I/O-bound; threads avoid GIL pain |
 | DB client | `trino` DBAPI | `>=0.328.0` | Cursor-based query execution | Official client |
 | Database | Starburst Galaxy (Trino) | managed | Query federation + storage | Project target |
 | Auth | OAuth2 (interactive flow, headless-patched) | `trino.auth.OAuth2Authentication` + monkeypatch | Bearer auth to Trino; login via Galaxy portal API | Avoids browser popup for servers/agents |
@@ -122,7 +122,7 @@ sequenceDiagram
 
 ## 5. Authentication Flow (headless OAuth2)
 
-`app_jwt.py` imports `StarburstClientJWT` ([`starburst_client_jwt.py:60`](../gen%20ai%20project/starburst-mcp2/starburst_client_jwt.py#L60)). The trick: `trino.auth.OAuth2Authentication` calls `webbrowser.open(url)` when it needs user consent; `StarburstClientJWT.get_connection()` uses `unittest.mock.patch` to redirect that call into `_HeadlessOAuth.handle_redirect`, which replays the Galaxy login via HTTP.
+`app_jwt.py` imports `StarburstClientJWT` ([`starburst_client_jwt.py:60`](../gen-ai-project/starburst-mcp2/starburst_client_jwt.py#L60)). The trick: `trino.auth.OAuth2Authentication` calls `webbrowser.open(url)` when it needs user consent; `StarburstClientJWT.get_connection()` uses `unittest.mock.patch` to redirect that call into `_HeadlessOAuth.handle_redirect`, which replays the Galaxy login via HTTP.
 
 ```mermaid
 sequenceDiagram
@@ -196,7 +196,7 @@ flowchart TD
     N -->|no| O[return None<br/>API replies with help text]
 ```
 
-Source: [`app_jwt.py:193-256`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L193-L256).
+Source: [`app_jwt.py:193-256`](../gen-ai-project/starburst-mcp2/app_jwt.py#L193-L256).
 
 ---
 
@@ -223,7 +223,7 @@ flowchart TD
     K -->|no| L[return None] --> X
 ```
 
-Source: [`app_jwt.py:260-295`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L260-L295) and the `/api/chat` error branch at [`app_jwt.py:417-429`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L417-L429).
+Source: [`app_jwt.py:260-295`](../gen-ai-project/starburst-mcp2/app_jwt.py#L260-L295) and the `/api/chat` error branch at [`app_jwt.py:417-429`](../gen-ai-project/starburst-mcp2/app_jwt.py#L417-L429).
 
 ---
 
@@ -262,22 +262,22 @@ graph LR
 
 | Name | Location | Lifetime | Thread safety | Invalidation |
 |---|---|---|---|---|
-| `_schema_cache` | module-global dict in `app_jwt.py:310` | Process lifetime | Not locked; read/write are atomic dict ops; pre-warmed on startup in a daemon thread ([`app_jwt.py:513-520`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L513-L520)) | TTL 300 s or `/api/schema?refresh=1` |
+| `_schema_cache` | module-global dict in `app_jwt.py:310` | Process lifetime | Not locked; read/write are atomic dict ops; pre-warmed on startup in a daemon thread ([`app_jwt.py:513-520`](../gen-ai-project/starburst-mcp2/app_jwt.py#L513-L520)) | TTL 300 s or `/api/schema?refresh=1` |
 | Trino connection | `StarburstClientJWT._conn` instance attr | Process lifetime, reused | **Not thread-safe.** FastAPI routes are async but the Trino cursor is sync; under concurrent requests a single shared cursor can corrupt results. See [Extension Points](#10-extension-points) | Reset to `None` on any `execute()` exception or `SELECT 1` liveness failure |
 | OAuth token | Inside Trino `OAuth2Authentication` object | Matches connection lifetime | Managed by Trino client | Auto-refresh by Trino client when token nears expiry |
 | Disk token cache | `token_cache.json` (only via `token_cache.py`, not `app_jwt.py`) | Cross-restart | Single writer | Checks `expires_at` with 60 s buffer; `save_token` rewrites |
 | FastAPI `app` state | Module global | Process lifetime | Managed by FastAPI/Uvicorn workers | N/A |
-| Static file mount `/static` | Conditional on `static/` folder existing at import ([`app_jwt.py:37-40`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L37-L40)) | Process lifetime | Read-only | N/A |
-| Startup banner + cache warm | `@app.on_event("startup")` ([`app_jwt.py:503`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L503)) | Once per process | `threading.Thread(daemon=True)` | N/A |
+| Static file mount `/static` | Conditional on `static/` folder existing at import ([`app_jwt.py:37-40`](../gen-ai-project/starburst-mcp2/app_jwt.py#L37-L40)) | Process lifetime | Read-only | N/A |
+| Startup banner + cache warm | `@app.on_event("startup")` ([`app_jwt.py:503`](../gen-ai-project/starburst-mcp2/app_jwt.py#L503)) | Once per process | `threading.Thread(daemon=True)` | N/A |
 
 ---
 
 ## 10. Extension Points
 
-- **LLM-backed NL to SQL.** Current engine is pure regex ([`_nl_to_sql`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L193)). Swap by injecting a function with signature `(message, catalog, schema) -> str | None` that calls an LLM with the schema cache as grounding context. Keep the regex path as a fast fallback.
+- **LLM-backed NL to SQL.** Current engine is pure regex ([`_nl_to_sql`](../gen-ai-project/starburst-mcp2/app_jwt.py#L193)). Swap by injecting a function with signature `(message, catalog, schema) -> str | None` that calls an LLM with the schema cache as grounding context. Keep the regex path as a fast fallback.
 - **Connection pooling / thread safety.** Replace the single shared `_conn` with a per-request connection or a bounded pool (`queue.Queue` of `StarburstClientJWT` instances) to avoid cursor contention under load.
 - **New auth providers.** `StarburstClientJWT._get_auth` returns `OAuth2Authentication()`; parameterize to accept `BasicAuthentication`, true JWT bearer, or SAML, selected via `.env`.
-- **New export formats.** Extend `/api/export/{fmt}` ([`app_jwt.py:442`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L442)) — add `parquet` via pyarrow, `json` trivially, or `markdown` for LLM hand-off.
+- **New export formats.** Extend `/api/export/{fmt}` ([`app_jwt.py:442`](../gen-ai-project/starburst-mcp2/app_jwt.py#L442)) — add `parquet` via pyarrow, `json` trivially, or `markdown` for LLM hand-off.
 - **Multi-tenant permissions.** Port `permission_manager.py` (currently MCP-only) into `app_jwt.py`: resolve developer from a header/JWT claim, gate `_exec` by permission flag.
 - **Observability.** Add a FastAPI middleware to emit structured logs + Prometheus metrics (query count, latency, NL-match rate, TABLE_NOT_FOUND fallback rate).
 - **Streaming results.** For large result sets, switch `/api/chat` to a WebSocket or SSE stream that yields rows as Trino delivers them.
@@ -291,7 +291,7 @@ graph LR
 3. **Deviations between optimized spec and actual code:**
    - **Auth is not OAuth2 client-credentials.** It is the standard **OAuth2 authorization-code flow** with `webbrowser.open` monkey-patched so `_HeadlessOAuth` replays the Galaxy portal login + redirect endpoint instead of opening a browser. Documented accurately in §5.
    - **`token_cache.py` is NOT wired into `app_jwt.py`.** The spec implied it was a direct collaborator; in reality it is a standalone script / CLI. Noted in §5 and §8.
-   - **Latent bug at [`app_jwt.py:525`](../gen%20ai%20project/starburst-mcp2/app_jwt.py#L525):** `uvicorn.run("app:app", ...)` references module `app`, not `app_jwt`. Running `python app_jwt.py` directly loads the wrong module. Recommended fix: `uvicorn.run("app_jwt:app", ...)`, or launch via `python -m uvicorn app_jwt:app --port 8000` (as the README instructs).
+   - **Latent bug at [`app_jwt.py:525`](../gen-ai-project/starburst-mcp2/app_jwt.py#L525):** `uvicorn.run("app:app", ...)` references module `app`, not `app_jwt`. Running `python app_jwt.py` directly loads the wrong module. Recommended fix: `uvicorn.run("app_jwt:app", ...)`, or launch via `python -m uvicorn app_jwt:app --port 8000` (as the README instructs).
    - **Schema cache is pre-warmed** on startup in a background daemon thread — worth calling out for operators (§9).
 4. **Sensitive values masked:**
    - Galaxy tenant host (category: `<TENANT>.galaxy.starburst.io`) — abstracted in all diagrams/examples; real value only lives in `.env` (gitignored).

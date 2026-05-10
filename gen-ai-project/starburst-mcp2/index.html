@@ -51,8 +51,25 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .tree-item.catalog .icon{color:var(--accent1)}
 .tree-item.schema-node .icon{color:var(--accent2)}
 .tree-item.table .icon{color:var(--accent3)}
+.tree-item.table .tree-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-expander{border:none;background:transparent;color:inherit;width:16px;padding:0;cursor:pointer;font-size:.75rem;line-height:1;text-align:center;flex-shrink:0}
+.tree-menu-btn{margin-left:auto;border:none;background:transparent;color:var(--muted);width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700;opacity:.75;flex-shrink:0}
+.tree-menu-btn:hover{background:var(--surface3);color:var(--text);opacity:1}
+.tree-item.column{padding:5px 8px 5px 12px;margin:1px 0 1px 4px;color:var(--text-muted);font-size:.78rem;border-left:1px solid rgba(148,163,184,.22);gap:7px}
+.tree-item.column:hover{background:rgba(59,130,246,.08);color:var(--text)}
+.tree-item.column .icon{width:12px;color:var(--accent1);font-size:.72rem}
+.column-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.column-type{margin-left:auto;color:var(--muted);font-size:.72rem;font-style:italic;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tree-children{padding-left:16px;overflow:hidden;transition:max-height .3s;max-height:0}
-.tree-children.open{max-height:2000px}
+.tree-children.open{max-height:10000px}
+.schema-context-menu{position:fixed;z-index:200;min-width:270px;max-width:360px;border:1px solid var(--border);border-radius:8px;background:var(--surface);box-shadow:0 18px 45px rgba(0,0,0,.35);padding:6px}
+.schema-menu-item{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:none;background:transparent;color:var(--text);font:inherit;font-size:.78rem;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer}
+.schema-menu-item:hover{background:var(--surface2)}
+.schema-menu-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.schema-menu-label{font-weight:650;line-height:1.2}
+.schema-menu-preview{font-family:'Fira Code',monospace;font-size:.66rem;line-height:1.35;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.schema-menu-sql{font-family:'Fira Code',monospace;font-size:.68rem;color:var(--accent1);white-space:nowrap}
+.schema-menu-divider{height:1px;background:var(--border);margin:5px 4px}
 .sidebar-bottom{padding:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .theme-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;color:var(--muted)}
 .toggle-track{width:44px;height:24px;border-radius:12px;background:var(--surface3);position:relative;transition:background .2s}
@@ -81,7 +98,19 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .msg-bubble{max-width:75%;border-radius:16px;overflow:hidden}
 .msg.user .msg-bubble{background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(59,130,246,.2));border:1px solid rgba(168,85,247,.2);padding:12px 16px;border-top-right-radius:4px}
 .msg.bot .msg-bubble{background:var(--surface2);border:1px solid var(--border);border-top-left-radius:4px;max-width:85%}
+.msg.bot .msg-bubble.chart-result{cursor:pointer;transition:border-color .2s,box-shadow .2s,background .2s}
+.msg.bot .msg-bubble.chart-result:hover{border-color:rgba(59,130,246,.45)}
+.msg.bot .msg-bubble.chart-result.active-result{border-color:var(--accent2);box-shadow:0 0 0 1px rgba(59,130,246,.35),0 10px 28px rgba(59,130,246,.08);background:linear-gradient(180deg,var(--surface2),rgba(59,130,246,.05))}
 .msg-text{font-size:.9rem;line-height:1.6}
+.confirm-panel{margin:12px 14px 0;padding:14px;border:1px solid rgba(239,68,68,.38);border-radius:10px;background:rgba(127,29,29,.18);display:flex;flex-direction:column;gap:12px}
+.confirm-title{font-size:.8rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fca5a5}
+.confirm-copy{font-size:.86rem;line-height:1.5;color:var(--text)}
+.confirm-actions{display:flex;flex-wrap:wrap;gap:10px}
+.confirm-btn{border:1px solid rgba(239,68,68,.45);border-radius:9px;padding:9px 13px;font-size:.8rem;font-weight:750;cursor:pointer;color:#fff;background:linear-gradient(135deg,#ef4444,#b91c1c);transition:transform .15s,opacity .15s}
+.confirm-btn:hover{transform:translateY(-1px)}
+.confirm-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.cancel-btn{border:1px solid var(--border);border-radius:9px;padding:9px 13px;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--text);background:var(--surface3)}
+.cancel-btn:hover{border-color:var(--muted)}
 
 /* SQL block */
 .sql-block{border-bottom:1px solid var(--border)}
@@ -103,6 +132,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .data-table th{padding:8px 12px;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface3);white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2}
 [data-theme="light"] .data-table th{background:var(--surface3)}
 .data-table td{padding:7px 12px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.data-table td.long-sql-cell{white-space:normal;max-width:none;overflow:visible;text-overflow:clip;vertical-align:top}
+.sql-value{display:block;width:100%;max-width:100%;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:'Fira Code',Consolas,monospace;font-size:.78rem;line-height:1.55;color:var(--text);background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:8px;padding:12px}
 .data-table tbody tr:nth-child(even){background:rgba(0,0,0,.06)}
 .data-table tbody tr:hover{background:rgba(168,85,247,.06)}
 .show-more-btn{display:block;width:100%;padding:8px;text-align:center;font-size:.8rem;color:var(--accent2);cursor:pointer;border:none;background:none;font-weight:500}
@@ -110,6 +141,24 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Export bar */
 .export-bar{display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--border)}
+.ai-insights{margin:10px 14px 0;padding:16px;border:1px solid rgba(168,85,247,.22);border-radius:8px;background:rgba(168,85,247,.06);display:flex;flex-direction:column;gap:12px}
+.ai-summary{font-size:.9rem;line-height:1.55;color:var(--text);font-weight:500;max-width:80ch}
+.ai-meta{display:flex;flex-wrap:wrap;gap:7px;margin:0;align-items:center}
+.ai-pill{display:inline-flex;align-items:center;min-height:24px;font-size:.72rem;line-height:1;font-weight:650;color:var(--text);border:1px solid rgba(148,163,184,.22);border-radius:999px;padding:5px 10px;background:rgba(10,10,15,.72);white-space:nowrap}
+.ai-list{list-style:none;margin:0;padding:0;color:var(--text);font-size:.86rem;line-height:1.5;display:flex;flex-direction:column;gap:6px}
+.ai-list li{position:relative;padding-left:20px;max-width:86ch}
+.ai-list li::before{content:'';position:absolute;left:4px;top:.68em;width:5px;height:5px;border-radius:50%;background:var(--accent2);opacity:.85}
+.dashboard-hints{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:0}
+.dashboard-card{border:1px solid var(--border);border-radius:8px;padding:12px;background:rgba(10,10,15,.72);min-height:72px;display:flex;flex-direction:column;justify-content:center}
+.dashboard-card-title{font-size:.82rem;line-height:1.35;color:var(--text);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dashboard-card-sub{font-size:.73rem;line-height:1.35;color:var(--muted);margin-top:6px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:0}
+.kpi-card{border:1px solid rgba(168,85,247,.32);border-radius:8px;padding:14px 15px;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(34,197,94,.08));min-height:118px;display:flex;flex-direction:column;justify-content:center}
+.kpi-label{font-size:.72rem;line-height:1.25;color:var(--muted);font-weight:750;text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-value{font-size:1.12rem;line-height:1.2;color:var(--text);font-weight:800;margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-sub{font-size:.78rem;line-height:1.35;color:var(--text);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-narration{margin:0;padding:12px 14px;border-left:3px solid var(--accent1);background:rgba(0,0,0,.14);border-radius:7px;color:var(--text);font-size:.86rem;line-height:1.5;max-width:86ch}
+@media(max-width:700px){.ai-insights{padding:14px}.kpi-grid,.dashboard-hints{grid-template-columns:1fr}.ai-pill{white-space:normal}.kpi-card{min-height:104px}}
 .suggestions-row{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 4px 52px;animation:fadeUp .3s ease}
 .suggestion-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:.8rem;cursor:pointer;transition:all .25s;white-space:nowrap}
 .suggestion-chip:hover{border-color:var(--purple);color:var(--text);background:rgba(168,85,247,.1);transform:translateY(-1px);box-shadow:0 4px 12px rgba(168,85,247,.15)}
@@ -249,11 +298,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       </div>
       <div>
         <div class="field-label">X-Axis Column</div>
-        <select class="field-select" id="xAxisSelect"><option value="">-- Select --</option></select>
+        <select class="field-select" id="xAxisSelect" onchange="updateChartConfigFromPanel()"><option value="">-- Select --</option></select>
       </div>
       <div>
         <div class="field-label">Y-Axis Column</div>
-        <select class="field-select" id="yAxisSelect"><option value="">-- Select --</option></select>
+        <select class="field-select" id="yAxisSelect" onchange="updateChartConfigFromPanel()"><option value="">-- Select --</option></select>
       </div>
       <div>
         <div class="field-label">Color Theme</div>
@@ -274,7 +323,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <script>
 const API='';
-const state={messages:[],currentData:null,currentMsgId:null,schema:null,theme:'dark',chartType:'bar',colorTheme:'purple',charts:{}};
+const state={messages:[],currentData:null,currentMsgId:null,selectedMsgId:null,schema:null,theme:'dark',chartType:'bar',colorTheme:'purple',chartConfig:{xAxis:null,yAxis:null,chartType:'bar'},results:{},chartConfigs:{},charts:{}};
 const colorThemes={
   purple:['rgba(168,85,247,.8)','rgba(59,130,246,.8)','rgba(6,182,212,.8)','rgba(34,197,94,.8)','rgba(245,158,11,.8)','rgba(236,72,153,.8)'],
   teal:['rgba(6,182,212,.8)','rgba(34,197,94,.8)','rgba(16,185,129,.8)','rgba(20,184,166,.8)','rgba(56,189,248,.8)','rgba(74,222,128,.8)'],
@@ -307,14 +356,24 @@ function renderSchema(data){
   const el=document.getElementById('schemaBrowser');
   if(!data||!data.schemas||!data.schemas.length){el.innerHTML='<div style="padding:16px;color:var(--muted);font-size:.8rem">No schemas found.</div>';return}
   let h='';
-  // Group by catalog if present, else flat
-  const catalog='mcp2ohio';
-  h+=`<div class="tree-item catalog" onclick="toggleTree(this)"><span class="icon">&#9671;</span><strong>${catalog}</strong></div><div class="tree-children open">`;
+  const catalog=data.catalog||'mcp2ohio';
+  h+=`<div class="tree-item catalog" onclick="toggleTree(this)"><span class="icon">&#9671;</span><strong>${esc(catalog)}</strong></div><div class="tree-children open">`;
   data.schemas.forEach(s=>{
-    h+=`<div class="tree-item schema-node" onclick="toggleTree(this)"><span class="icon">&#9655;</span>${s.name}</div><div class="tree-children">`;
+    h+=`<div class="tree-item schema-node" onclick="toggleTree(this)"><span class="icon">&#9655;</span>${esc(s.name)}</div><div class="tree-children">`;
     (s.tables||[]).forEach(t=>{
       const tn=typeof t==='string'?t:t.name;
-      h+=`<div class="tree-item table" onclick="insertTableQuery('${catalog}','${s.name}','${tn}')"><span class="icon">&#9638;</span>${tn}</div>`;
+      const columns=Array.isArray(t.columns)?t.columns:[];
+      h+=`<div class="tree-item table" oncontextmenu='openTableMenu(event,${jsArg(catalog)},${jsArg(s.name)},${jsArg(tn)})' onclick='insertTableQuery(${jsArg(catalog)},${jsArg(s.name)},${jsArg(tn)})'><button class="tree-expander icon" title="Expand table" onclick="toggleTree(this.closest('.tree-item'),event)">&#9655;</button><span class="tree-label">${esc(tn)}</span><button class="tree-menu-btn" title="Table actions" onclick='openTableMenu(event,${jsArg(catalog)},${jsArg(s.name)},${jsArg(tn)})'>&#8942;</button></div><div class="tree-children">`;
+      if(columns.length){
+        columns.forEach(c=>{
+          const cn=typeof c==='string'?c:c.name;
+          const ct=typeof c==='string'?'unknown':(c.type||'unknown');
+          h+=`<div class="tree-item column" title="${esc(cn)} (${esc(ct)})" onclick='insertColumnQuery(event,${jsArg(catalog)},${jsArg(s.name)},${jsArg(tn)},${jsArg(cn)})'><span class="icon">&#9632;</span><span class="column-name">${esc(cn)}</span><span class="column-type">${esc(ct)}</span></div>`;
+        });
+      }else{
+        h+=`<div class="tree-item column" style="cursor:default"><span class="icon">&#9632;</span><span class="column-name">No columns loaded</span><span class="column-type">unknown</span></div>`;
+      }
+      h+=`</div>`;
     });
     h+=`</div>`;
   });
@@ -322,7 +381,8 @@ function renderSchema(data){
   el.innerHTML=h;
 }
 
-function toggleTree(el){
+function toggleTree(el,event){
+  if(event){event.stopPropagation();event.preventDefault()}
   const children=el.nextElementSibling;
   if(children&&children.classList.contains('tree-children')){
     children.classList.toggle('open');
@@ -332,11 +392,77 @@ function toggleTree(el){
 }
 
 function insertTableQuery(catalog,schema,table){
+  closeTableMenu();
   const input=document.getElementById('chatInput');
-  input.value=`SELECT * FROM ${catalog}.${schema}.${table} LIMIT 100`;
+  input.value=`SELECT * FROM ${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(table)} LIMIT 100;`;
   input.focus();
   autoResize(input);
 }
+
+function insertColumnQuery(event,catalog,schema,table,column){
+  if(event){event.stopPropagation()}
+  closeTableMenu();
+  const input=document.getElementById('chatInput');
+  input.value=`SELECT ${quoteIdent(column)} FROM ${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(table)} LIMIT 100;`;
+  input.focus();
+  autoResize(input);
+}
+
+function insertEditorSQL(sql){
+  closeTableMenu();
+  const input=document.getElementById('chatInput');
+  input.value=sql;
+  input.focus();
+  autoResize(input);
+}
+
+function tablePath(catalog,schema,table){
+  return `${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(table)}`;
+}
+
+function openTableMenu(event,catalog,schema,table){
+  if(event){event.preventDefault();event.stopPropagation()}
+  closeTableMenu();
+  const fullPath=tablePath(catalog,schema,table);
+  const displayPath=`${catalog}.${schema}.${table}`;
+  const selectSql=`SELECT * FROM ${fullPath} LIMIT 100;`;
+  const describeSql=`DESCRIBE ${fullPath};`;
+  const showCreateSql=`SHOW CREATE TABLE ${fullPath};`;
+  const menu=document.createElement('div');
+  menu.className='schema-context-menu';
+  menu.id='schemaContextMenu';
+  menu.style.left=Math.min(event.clientX,window.innerWidth-380)+'px';
+  menu.style.top=Math.min(event.clientY,window.innerHeight-310)+'px';
+  menu.innerHTML=`
+    <button class="schema-menu-item" onclick='copyTablePath(${jsArg(fullPath)})'><span class="schema-menu-main"><span class="schema-menu-label">Copy full path</span><span class="schema-menu-preview">${esc(displayPath)}</span></span></button>
+    <button class="schema-menu-item" onclick='insertEditorSQL(${jsArg(selectSql)})'><span class="schema-menu-main"><span class="schema-menu-label">Generate SQL for this data</span><span class="schema-menu-preview">${esc(selectSql)}</span></span></button>
+    <div class="schema-menu-divider"></div>
+    <button class="schema-menu-item" onclick='insertEditorSQL(${jsArg(selectSql)})'><span class="schema-menu-main"><span class="schema-menu-label">SELECT * query</span><span class="schema-menu-preview">${esc(selectSql)}</span></span><span class="schema-menu-sql">LIMIT 100</span></button>
+    <button class="schema-menu-item" onclick='insertEditorSQL(${jsArg(describeSql)})'><span class="schema-menu-main"><span class="schema-menu-label">DESCRIBE query</span><span class="schema-menu-preview">${esc(describeSql)}</span></span></button>
+    <button class="schema-menu-item" onclick='insertEditorSQL(${jsArg(showCreateSql)})'><span class="schema-menu-main"><span class="schema-menu-label">SHOW CREATE TABLE query</span><span class="schema-menu-preview">${esc(showCreateSql)}</span></span></button>
+    <div class="schema-menu-divider"></div>
+    <button class="schema-menu-item" onclick='insertTableQuery(${jsArg(catalog)},${jsArg(schema)},${jsArg(table)})'><span class="schema-menu-main"><span class="schema-menu-label">Go to table</span><span class="schema-menu-preview">${esc(selectSql)}</span></span></button>
+  `;
+  document.body.appendChild(menu);
+}
+
+function closeTableMenu(){
+  const menu=document.getElementById('schemaContextMenu');
+  if(menu){menu.remove()}
+}
+
+function copyTablePath(path){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(path).then(()=>showToast('Table path copied','success')).catch(()=>insertEditorSQL(path));
+  }else{
+    insertEditorSQL(path);
+  }
+  closeTableMenu();
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest||!e.target.closest('#schemaContextMenu')){closeTableMenu()}
+});
 
 // Theme
 function toggleTheme(){
@@ -396,11 +522,12 @@ function autoResize(el){
 }
 
 // Send message
-async function sendMessage(prefill,sqlOverride){
+async function sendMessage(prefill,sqlOverride,extraContext){
   const input=document.getElementById('chatInput');
   const displayText=(prefill||input.value).trim();
   const queryText=sqlOverride||displayText;
   if(!displayText)return;
+  if(window.innerWidth<=900)closeSidebars();
   input.value='';input.style.height='auto';
 
   // Clear welcome
@@ -417,7 +544,7 @@ async function sendMessage(prefill,sqlOverride){
   try{
     const res=await fetch(API+'/api/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:queryText,context:{catalog:'mcp2ohio',schema:'test_writes'}})
+      body:JSON.stringify({message:queryText,context:{catalog:'mcp2ohio',schema:'test_writes',...(extraContext||{})}})
     });
     const data=await res.json();
     removeTyping();
@@ -428,8 +555,9 @@ async function sendMessage(prefill,sqlOverride){
       state.messages.push({role:'bot',data,id:msgId});
       state.currentData=data;
       state.currentMsgId=msgId;
+      state.results[msgId]=data;
       appendBotMsg(data,msgId);
-      updateChartPanel(data);
+      selectChartResult(msgId);
     }
   }catch(e){
     removeTyping();
@@ -456,9 +584,54 @@ function appendErrorMsg(text){
   el.insertAdjacentHTML('beforeend',`<div class="msg bot"><div class="msg-avatar">AI</div><div class="msg-bubble" style="border-color:rgba(239,68,68,.3)"><div class="msg-text" style="color:#f87171">${esc(text)}</div></div></div>`);
 }
 
+async function confirmOperation(msgId){
+  const msg=state.messages.find(m=>m.id===msgId);
+  if(!msg||!msg.data||!msg.data.sql)return;
+  if(window.innerWidth<=900)closeSidebars();
+  const btn=document.getElementById(msgId+'_confirmBtn');
+  const cancel=document.getElementById(msgId+'_cancelBtn');
+  if(btn){btn.disabled=true;btn.textContent='Running...'}
+  if(cancel)cancel.disabled=true;
+  appendUserMsg('Confirm '+(msg.data.operation||'operation'));
+  appendTyping();
+  document.getElementById('sendBtn').disabled=true;
+  try{
+    const res=await fetch(API+'/api/chat',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:msg.data.sql,context:{catalog:'mcp2ohio',schema:'test_writes',confirm:true}})
+    });
+    const data=await res.json();
+    removeTyping();
+    if(!res.ok||data.detail){
+      appendErrorMsg(data.detail||data.message||'Confirmed operation failed.');
+    }else{
+      const newMsgId='msg_'+Date.now();
+      state.messages.push({role:'bot',data,id:newMsgId});
+      state.currentData=data;
+      state.currentMsgId=newMsgId;
+      state.results[newMsgId]=data;
+      appendBotMsg(data,newMsgId);
+      if(data.columns&&data.rows&&data.rows.length>0)selectChartResult(newMsgId);
+    }
+  }catch(e){
+    removeTyping();
+    appendErrorMsg('Failed to confirm operation. Make sure the backend is running at '+API);
+  }
+  document.getElementById('sendBtn').disabled=false;
+  scrollChat();
+}
+
+function cancelOperation(msgId){
+  const panel=document.getElementById(msgId+'_confirmPanel');
+  if(panel){
+    panel.innerHTML='<div class="confirm-title">Operation cancelled</div><div class="confirm-copy">No destructive query was executed.</div>';
+  }
+}
+
 function appendBotMsg(data,msgId){
   const el=document.getElementById('chatMessages');
-  let html=`<div class="msg bot"><div class="msg-avatar">AI</div><div class="msg-bubble" id="${msgId}">`;
+  const isChartable=!!(data.columns&&data.rows&&data.rows.length>0);
+  let html=`<div class="msg bot"><div class="msg-avatar">AI</div><div class="msg-bubble${isChartable?' chart-result':''}" id="${msgId}" data-result-id="${msgId}" ${isChartable?`onclick="selectChartResult('${msgId}')"`:''}>`;
 
   // Message text
   if(data.message){html+=`<div class="data-section" style="padding-bottom:0"><div class="msg-text">${esc(data.message)}</div></div>`}
@@ -469,6 +642,21 @@ function appendBotMsg(data,msgId){
       <span>SQL Query</span><span style="font-size:1rem">&#9662;</span></div>
       <div class="sql-body"><pre>${highlightSQL(data.sql)}</pre></div></div>`;
   }
+
+  if(data.requires_confirm){
+    const op=esc(data.operation||'operation');
+    const target=data.target?[data.target.catalog,data.target.schema,data.target.table].filter(Boolean).join('.'):'the selected object';
+    html+=`<div class="confirm-panel" id="${msgId}_confirmPanel">
+      <div class="confirm-title">Confirmation required</div>
+      <div class="confirm-copy">This ${op} will modify data in <strong>${esc(target)}</strong>. Review the SQL above, then confirm only if you intend to run it.</div>
+      <div class="confirm-actions">
+        <button class="confirm-btn" id="${msgId}_confirmBtn" onclick="confirmOperation('${msgId}')">Confirm and run</button>
+        <button class="cancel-btn" id="${msgId}_cancelBtn" onclick="cancelOperation('${msgId}')">Cancel</button>
+      </div>
+    </div>`;
+  }
+
+  html+=renderAIInsights(data);
 
   // Table
   if(data.columns&&data.rows&&data.rows.length){
@@ -523,6 +711,75 @@ function getFQTable(sql){
   return m?m[1]:null;
 }
 
+function renderAIInsights(data){
+  const hasSummary=!!data.summary;
+  const insights=Array.isArray(data.insights)?data.insights:[];
+  const assumptions=Array.isArray(data.assumptions)?data.assumptions:[];
+  const cards=data.dashboard&&Array.isArray(data.dashboard.cards)?data.dashboard.cards:[];
+  const kpis=Array.isArray(data.kpis)?data.kpis:[];
+  const trends=Array.isArray(data.trend_highlights)?data.trend_highlights:[];
+  const recs=Array.isArray(data.recommendations)?data.recommendations:[];
+  if(!hasSummary&&!insights.length&&!assumptions.length&&!cards.length&&!kpis.length&&!trends.length&&!recs.length&&!data.chart_explanation)return '';
+  let html='<div class="ai-insights">';
+  if(hasSummary)html+=`<div class="ai-summary">${esc(data.summary)}</div>`;
+  const pills=[];
+  if(data.llm_source)pills.push(`source: ${data.llm_source}`);
+  if(data.query_type)pills.push(`type: ${data.query_type}`);
+  if(data.data_grounded===true)pills.push('data-grounded');
+  if(data.source_type)pills.push('enterprise sources only');
+  if(typeof data.confidence==='number')pills.push(`confidence: ${Math.round(data.confidence*100)}%`);
+  if(data.chart_suggestion)pills.push(`chart: ${data.chart_suggestion}`);
+  if(pills.length){
+    html+='<div class="ai-meta">';
+    pills.forEach(p=>{html+=`<span class="ai-pill">${esc(p)}</span>`});
+    html+='</div>';
+  }
+  if(kpis.length){
+    html+='<div class="kpi-grid">';
+    kpis.slice(0,4).forEach(k=>{
+      html+=`<div class="kpi-card"><div class="kpi-label">${esc(k.label||'KPI')}</div><div class="kpi-value">${esc(String(k.value||''))}</div><div class="kpi-sub">${esc(k.subtitle||'')}</div></div>`;
+    });
+    html+='</div>';
+  }
+  if(insights.length){
+    html+='<ul class="ai-list">';
+    insights.slice(0,4).forEach(i=>{html+=`<li>${esc(i)}</li>`});
+    html+='</ul>';
+  }
+  if(trends.length){
+    html+='<ul class="ai-list">';
+    trends.slice(0,3).forEach(i=>{html+=`<li>${esc(i)}</li>`});
+    html+='</ul>';
+  }
+  if(data.chart_explanation){
+    html+=`<div class="chart-narration">${esc(data.chart_explanation)}</div>`;
+  }
+  if(recs.length){
+    html+='<ul class="ai-list">';
+    recs.slice(0,3).forEach(i=>{html+=`<li>${esc(i)}</li>`});
+    html+='</ul>';
+  }
+  if(assumptions.length){
+    html+='<div class="ai-meta">';
+    assumptions.slice(0,3).forEach(a=>{html+=`<span class="ai-pill">${esc(a)}</span>`});
+    html+='</div>';
+  }
+  if(Array.isArray(data.data_sources)&&data.data_sources.length){
+    html+='<div class="ai-meta">';
+    data.data_sources.slice(0,4).forEach(s=>{html+=`<span class="ai-pill">${esc(s)}</span>`});
+    html+='</div>';
+  }
+  if(cards.length){
+    html+='<div class="dashboard-hints">';
+    cards.slice(0,3).forEach(c=>{
+      html+=`<div class="dashboard-card"><div class="dashboard-card-title">${esc(c.title||'Dashboard card')}</div><div class="dashboard-card-sub">${esc(c.type||'table')} · ${esc(String(c.row_count||0))} rows</div></div>`;
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
 function getChipIcon(label){
   const l=label.toLowerCase();
   if(l.startsWith('show all table')||l.startsWith('show tables')||l.startsWith('list')) return '📋';
@@ -545,6 +802,9 @@ function getSuggestions(data){
   const cols=data.columns||[];
   const rows=data.rows||[];
   const suggestions=[];
+  if(Array.isArray(data.followups)){
+    data.followups.slice(0,3).forEach(f=>suggestions.push({label:f,sql:f}));
+  }
   const fq=getFQTable(sql);
 
   // After SHOW TABLES
@@ -636,10 +896,24 @@ function renderTable(columns,rows,msgId){
   columns.forEach(c=>h+=`<th>${esc(c)}</th>`);
   h+=`</tr></thead><tbody id="${msgId}_tbody">`;
   const display=showAll?rows:rows.slice(0,limit);
-  display.forEach(r=>{h+=`<tr>`;columns.forEach((_c,i)=>h+=`<td title="${esc(String(r[i]??''))}">${esc(String(r[i]??''))}</td>`);h+=`</tr>`});
+  display.forEach(r=>{h+=`<tr>`;columns.forEach((c,i)=>h+=renderTableCell(c,r[i]));h+=`</tr>`});
   h+=`</tbody></table></div>`;
   if(!showAll){h+=`<button class="show-more-btn" onclick="showAllRows('${msgId}')">Show all ${rows.length} rows</button>`}
   return h;
+}
+
+function renderTableCell(column,value){
+  const text=String(value??'');
+  if(isLongSQLValue(column,text)){
+    return `<td class="long-sql-cell"><pre class="sql-value">${highlightSQL(text)}</pre></td>`;
+  }
+  return `<td title="${esc(text)}">${esc(text)}</td>`;
+}
+
+function isLongSQLValue(column,text){
+  const col=String(column||'').toLowerCase();
+  const normalized=text.trim().toUpperCase();
+  return col.includes('create')||col.includes('ddl')||text.length>160||normalized.startsWith('CREATE TABLE')||normalized.startsWith('SHOW CREATE TABLE');
 }
 
 function showAllRows(msgId){
@@ -649,7 +923,7 @@ function showAllRows(msgId){
   if(!tbody)return;
   const{columns,rows}=msg.data;
   let h='';
-  rows.forEach(r=>{h+=`<tr>`;columns.forEach((_c,i)=>h+=`<td title="${esc(String(r[i]??''))}">${esc(String(r[i]??''))}</td>`);h+=`</tr>`});
+  rows.forEach(r=>{h+=`<tr>`;columns.forEach((c,i)=>h+=renderTableCell(c,r[i]));h+=`</tr>`});
   tbody.innerHTML=h;
   const btn=tbody.closest('.data-section').querySelector('.show-more-btn');
   if(btn)btn.remove();
@@ -788,17 +1062,38 @@ function downloadBlob(blob,name){
 }
 
 // Chart
-function renderChart(msgId,columns,rows,type){
+function renderChart(msgId,columns,rows,type,config={}){
   const canvas=document.getElementById(msgId+'_chart');
   if(!canvas||!rows.length)return;
 
   // Determine label and value column indices
   const strIdxs=columns.map((_,i)=>i).filter(i=>rows[0]&&typeof rows[0][i]==='string');
   const numIdxs=columns.map((_,i)=>i).filter(i=>rows[0]&&typeof rows[0][i]==='number');
-  const labelIdx=strIdxs.length?strIdxs[0]:0;
+  const selectedLabelIdx=config.xAxis?columns.indexOf(config.xAxis):-1;
+  const selectedValueIdx=config.yAxis?columns.indexOf(config.yAxis):-1;
+  const labelIdx=selectedLabelIdx>=0?selectedLabelIdx:(strIdxs.length?strIdxs[0]:0);
   // Remove labelIdx from value columns to avoid overlap
-  let valIdxs=numIdxs.filter(i=>i!==labelIdx);
+  let valIdxs=(selectedValueIdx>=0&&selectedValueIdx!==labelIdx)?[selectedValueIdx]:numIdxs.filter(i=>i!==labelIdx);
   if(!valIdxs.length) valIdxs=numIdxs.length>1?numIdxs.slice(1):[columns.length>1?1:0];
+  if(valIdxs.length>1){
+    const stats=valIdxs.map(i=>{
+      const vals=rows.slice(0,50).map(r=>Math.abs(Number(r[i])||0));
+      return {idx:i,max:Math.max(...vals),avg:vals.reduce((a,b)=>a+b,0)/(vals.length||1)};
+    }).filter(s=>s.max>0);
+    const maxVal=Math.max(...stats.map(s=>s.max));
+    const minVal=Math.min(...stats.map(s=>s.max));
+    if(stats.length>1&&maxVal/minVal>20){
+      const preferred=['revenue','sales','profit','actual','forecast','value','reviews','stock'];
+      const picked=stats
+        .sort((a,b)=>{
+          const ap=preferred.findIndex(p=>columns[a.idx].toLowerCase().includes(p));
+          const bp=preferred.findIndex(p=>columns[b.idx].toLowerCase().includes(p));
+          const ar=ap<0?99:ap; const br=bp<0?99:bp;
+          return ar-br||b.max-a.max;
+        })[0];
+      valIdxs=[picked.idx];
+    }
+  }
 
   const labelColName=columns[labelIdx];
   const labels=rows.slice(0,50).map(r=>String(r[labelIdx]??''));
@@ -821,6 +1116,10 @@ function renderChart(msgId,columns,rows,type){
   const isPie=chartType==='pie'||chartType==='doughnut';
   const valColNames=valIdxs.map(i=>columns[i]).join(', ');
   const chartTitle=isPie?`${valColNames} by ${labelColName}`:`${labelColName} vs ${valColNames}`;
+  canvas.dataset.chartTitle=chartTitle;
+  canvas.dataset.xAxis=labelColName;
+  canvas.dataset.yAxis=valColNames;
+  canvas.dataset.chartType=chartType;
 
   state.charts[msgId]=new Chart(canvas,{
     type:chartType,
@@ -857,19 +1156,26 @@ function updateChartPanel(data){
   if(!data||!data.columns)return;
   const xSel=document.getElementById('xAxisSelect');
   const ySel=document.getElementById('yAxisSelect');
+  const msgId=state.selectedMsgId||state.currentMsgId;
+  const existing=msgId?state.chartConfigs[msgId]:null;
+  const sample=data.rows&&data.rows.length?data.rows[0]:[];
+  const strCols=data.columns.filter((_,i)=>sample&&typeof sample[i]==='string');
+  const numCols=data.columns.filter((_,i)=>sample&&typeof sample[i]==='number');
   xSel.innerHTML=data.columns.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  ySel.innerHTML=data.columns.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  // Auto-select
-  const strCols=data.columns.filter(c=>data.rows[0]&&isNaN(Number(data.rows[0][c])));
-  const numCols=data.columns.filter(c=>data.rows[0]&&!isNaN(Number(data.rows[0][c])));
-  if(strCols.length)xSel.value=strCols[0];
-  if(numCols.length)ySel.value=numCols[0];
+  ySel.innerHTML=(numCols.length?numCols:data.columns).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const suggestedType=(data.chart_suggestion&&data.chart_suggestion!=='metric'&&data.chart_suggestion!=='table')?data.chart_suggestion:'bar';
+  state.chartType=(existing&&existing.chartType)||suggestedType;
+  document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===state.chartType));
+  xSel.value=(existing&&data.columns.includes(existing.xAxis))?existing.xAxis:(strCols[0]||data.columns[0]||'');
+  ySel.value=(existing&&data.columns.includes(existing.yAxis))?existing.yAxis:(numCols[0]||data.columns.find(c=>c!==xSel.value)||data.columns[0]||'');
+  updateChartConfigFromPanel();
 }
 
 function selectChartType(type,btn){
   state.chartType=type;
   document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  updateChartConfigFromPanel();
 }
 function selectColorTheme(theme,el){
   state.colorTheme=theme;
@@ -877,9 +1183,37 @@ function selectColorTheme(theme,el){
   el.classList.add('active');
 }
 function generateChartFromPanel(){
-  if(!state.currentMsgId||!state.currentData)return;
-  renderChart(state.currentMsgId,state.currentData.columns,state.currentData.rows,state.chartType);
+  const msgId=getSelectedChartResultId();
+  const data=msgId?state.results[msgId]:null;
+  if(!msgId||!data)return;
+  const config=updateChartConfigFromPanel();
+  renderChart(msgId,data.columns,data.rows,state.chartType,config);
   showToast('Chart updated','success');
+}
+
+function updateChartConfigFromPanel(){
+  const xSel=document.getElementById('xAxisSelect');
+  const ySel=document.getElementById('yAxisSelect');
+  state.chartConfig={xAxis:xSel?xSel.value:null,yAxis:ySel?ySel.value:null,chartType:state.chartType};
+  const msgId=getSelectedChartResultId();
+  if(msgId){state.chartConfigs[msgId]={...state.chartConfig}}
+  return state.chartConfig;
+}
+
+function getSelectedChartResultId(){
+  if(state.selectedMsgId&&state.results[state.selectedMsgId])return state.selectedMsgId;
+  if(state.currentMsgId&&state.results[state.currentMsgId])return state.currentMsgId;
+  const ids=Object.keys(state.results);
+  return ids.length?ids[ids.length-1]:null;
+}
+
+function selectChartResult(msgId){
+  if(!msgId||!state.results[msgId])return;
+  state.selectedMsgId=msgId;
+  state.currentMsgId=state.currentMsgId||msgId;
+  state.currentData=state.currentData||state.results[msgId];
+  document.querySelectorAll('.chart-result').forEach(el=>el.classList.toggle('active-result',el.id===msgId));
+  updateChartPanel(state.results[msgId]);
 }
 
 // SQL highlighting
@@ -915,6 +1249,8 @@ function showToast(msg,type='success'){
 }
 
 // Utility
+function quoteIdent(name){return `"${String(name).replace(/"/g,'""')}"`}
+function jsArg(value){return JSON.stringify(String(value))}
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function scrollChat(){const el=document.getElementById('chatMessages');setTimeout(()=>el.scrollTop=el.scrollHeight,50)}
 </script>

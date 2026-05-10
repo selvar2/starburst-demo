@@ -543,3 +543,265 @@ Verification results:
 #### STATUS: SUCCESS
 #### OBSERVATIONS: The earlier failure was fully explained by missing web dependencies in the fresh environment. After installing them, the app served both the UI and live backend data on port 8000.
 #### NEXT STEP: None — clean restart and verification complete.
+
+---
+
+## SESSION 2026-05-09 — NL-driven DDL/DML feature
+
+### BEFORE state (logged 2026-05-09T15:18Z)
+
+**Goal:** Extend the FastAPI chatbot at `/api/chat` to handle natural-language DDL (CREATE/ALTER/DROP/TRUNCATE) and DML (INSERT/UPDATE/DELETE/MERGE), in addition to the existing SELECT/SHOW/DESCRIBE patterns.
+
+**Discovery (parallel Explore agent + direct reads):**
+
+| Component | Location | Notes |
+|---|---|---|
+| NL→SQL flow | `gen-ai-project/starburst-mcp2/app_jwt.py:193-256` (`_nl_to_sql`) | SELECT/SHOW/DESCRIBE only. Raw SQL passes through if it contains a dot. |
+| Context hints parser | `app_jwt.py:152-182` (`_extract_context`) | Recognizes "is part of X schema and part of Y catalog". |
+| SQL execution | `app_jwt.py:90-98` (`_exec`) | Calls `client.execute()` directly — bypasses permissions and validation. |
+| Trino client | `starburst_client_jwt.py:126-149` (`StarburstClientJWT.execute`) | **Already supports DDL/DML** — returns `{rows_affected, status}` for non-SELECT. |
+| Identifier validation | `starburst_client_jwt.py:151-156` (`validate_identifier`) | Static method, regex `^[a-zA-Z][a-zA-Z0-9_]*$` + reserved-word block. |
+| Permission engine | `permission_manager.py` (`PermissionManager.check_with_message`) | YAML-driven, hot-reloaded. **NOT used by app_jwt.py currently.** |
+| Permission keys | `permissions.yaml` | read, insert, update, delete, create_schema, create_table, drop_table, drop_schema, truncate, merge, execute_raw |
+| Existing developer | `STARBURST_DEVELOPER=prakashrajr666` (admin profile) | All permissions granted in current `.env`. |
+| MCP write tools | `tools/write_tools.py` | DDL/DML tools already implemented for MCP server, gated by perms + `confirm=true` for destructive ops. **app_jwt.py does NOT call them.** |
+| Tests | `tests/test_permission_manager.py`, `tests/test_starburst_client.py`, `tests/test_integration.py` | Unit + integration. |
+
+**Architectural finding:** `app_jwt.py` is fully independent of the permission/validation layer that exists for the MCP side. Extending NL coverage requires (a) new patterns in `_nl_to_sql`, (b) a strict FQ validator on the generated SQL, (c) a permission check via `PermissionManager`, (d) a destructive-op confirm guard.
+
+**Plan (minimal/focused):**
+1. Backup `app_jwt.py` → `gen-ai-project/starburst-mcp2/backup/app_jwt.20260509_204843.bak.py` with header comment.
+2. Edit `app_jwt.py`:
+   - Import `os`, `PermissionManager`. Init `_perms` and `_developer` once.
+   - Add `_classify_sql(sql)` → (op_label, perm_key).
+   - Add `_extract_target(sql, op_label)` and `_validate_fq(sql, op_label)` — rejects if not fully qualified.
+   - Add NL patterns to `_nl_to_sql` for: insert/update/delete/truncate/drop table/drop schema/create schema/merge. CREATE TABLE & ALTER deferred to raw-SQL passthrough.
+   - In `/api/chat`: after NL→SQL, classify → validate FQ → check perm → require `context.confirm=true` for destructive ops → execute.
+3. Add `tests/test_app_jwt_nl.py` for unit coverage of the helpers.
+4. Restart uvicorn and smoke-test.
+5. Log AFTER state with results.
+
+**Constraints honored:**
+- All DDL/DML SQL must reference fully qualified `catalog.schema.table` (or `catalog.schema` for schema-level ops). Validator rejects bare names.
+- Destructive ops (drop_table, drop_schema, truncate, delete) require explicit confirm.
+- Permissions enforced via existing `PermissionManager` against `STARBURST_DEVELOPER` from `.env`.
+- No edits to existing read paths; SELECT flow unchanged.
+
+### AFTER state (logged 2026-05-09T15:35Z — completion)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — extended (backup at `gen-ai-project/starburst-mcp2/backup/app_jwt.20260509_204843.bak.py`)
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — new (48 unit tests)
+
+**Code additions in `app_jwt.py`:**
+
+1. **Imports:** `os`, `PermissionManager`. Module init: `_perms = PermissionManager()`, `_developer = os.getenv("STARBURST_DEVELOPER", "unknown")`.
+2. **Exceptions:** `FQValidationError`, `PermissionDenied`, `ConfirmRequired`.
+3. **Classification:** `_classify_sql(sql) -> (op_label, perm_key)` covering all 14 SQL prefixes.
+4. **FQ validator:** `_validate_fq(sql, op_label) -> dict` — extracts target via per-op regex, requires 3-part `catalog.schema.table` (or 2-part for schema-level ops), validates each identifier via `StarburstClient.validate_identifier`. Read ops are exempt.
+5. **Permission check:** `_check_permission(perm_key)` — wraps `PermissionManager.check_with_message` with the developer ID from `.env`.
+6. **Destructive guard:** `_enforce_destructive_confirm(perm_key, op_label, target, confirm)` — raises `ConfirmRequired` for `drop_table` / `drop_schema` / `truncate` / `delete` unless `context.confirm=true`.
+7. **NL patterns** (added to `_nl_to_sql`, hoisted above the dot-passthrough so numeric literals like `1.0` don't trigger raw-SQL passthrough on writes):
+   - `delete (from)? <tbl> [where ...]`
+   - `truncate [table] <tbl>`
+   - `drop table <tbl>` / `drop schema <sch>`
+   - `create schema <sch>`
+   - `update <tbl> set <cols> [where ...]`
+   - `insert (into)? <tbl> values (...)`
+   - Bare table names auto-qualify to `{catalog}.{schema}.{table}` from defaults / context hints.
+   - Complex CREATE TABLE column DDL and full MERGE statements still flow through raw-SQL passthrough, then the FQ validator + perm + confirm layer.
+8. **`/api/chat` wiring:** after `_nl_to_sql`, classify → validate FQ → check perm → enforce destructive confirm → execute. Errors map to:
+   - 400 with `{"error":"fq_validation",...}` for bad FQ
+   - 403 with `{"error":"permission_denied",...}` for perm denial
+   - 200 with `{"requires_confirm":true, "operation":..., "target":..., "message":...}` for destructive ops awaiting confirm
+   - 200 with `{"rows_affected":..., "status":...}` on successful DML/DDL
+9. **`_exec` enhancement:** normalizes `{rows_affected, status}` results into the response shape so the chart pipeline doesn't break for write ops.
+
+**Safety rules added:**
+
+| Rule | Where | Effect |
+|---|---|---|
+| FQ name required for all DDL/DML | `_validate_fq` | 400 if target is < 3 parts (or < 2 for schema-level ops) |
+| Identifier syntax check on every part | `StarburstClient.validate_identifier` | 400 on reserved words or non-identifier chars |
+| Permission gate per op | `PermissionManager.check_with_message` | 403 if developer profile lacks the required permission |
+| Destructive confirm | `_enforce_destructive_confirm` | 200 + `requires_confirm:true` until client resends with `context.confirm=true` |
+| Read path unchanged | (no edit) | Existing SELECT/SHOW/DESCRIBE behavior fully preserved |
+
+**Tests executed and results:**
+
+```
+pytest tests/test_app_jwt_nl.py -v          → 48 passed
+pytest tests/ -v -m "not integration"        → 62 passed, 6 deselected
+pytest tests/test_integration.py -v          → 6 passed (51 s, hits live cluster)
+```
+
+**Live smoke tests against http://127.0.0.1:8000/api/chat:**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| 1 | `delete from demo where id=99999` (no confirm) | requires_confirm=true | ✅ requires_confirm=true, sql qualified to mcp2ohio.test_writes.demo |
+| 2 | same + `context.confirm=true` | rows_affected=N | ✅ rows_affected=0, executed |
+| 3 | `DROP TABLE bare_table` | requires_confirm OR fq_validation | ✅ requires_confirm=true (auto-qualified) |
+| 4 | `insert into demo values (777, 'nl_test', 7.7)` | rows_affected=1 | ✅ rows_affected=1 |
+| 5 | `DELETE FROM test_writes.demo WHERE 1=0` (2 parts) | 400 fq_validation | ✅ HTTP 400, "got 'test_writes.demo'" |
+| 6 | `show all tables` (regression) | 200 with tables | ✅ row_count=5, op=SHOW |
+| 7 | `DROP TABLE mcp2ohio.test_writes.SELECT` | 400 (reserved word) | ✅ HTTP 400, "is a SQL reserved word" |
+| 8 | `update demo set name='updated_via_nl' where id=2` | rows_affected=1 | ✅ rows_affected=1 |
+
+**Remaining risks / limitations:**
+
+1. **Single-developer permission model.** The chat UI runs as one `STARBURST_DEVELOPER` from `.env`. There is no per-session identity. For multi-tenant deployment, a JWT/session resolution layer is required.
+2. **Auto-qualification of bare names** uses `STARBURST_CATALOG`/`STARBURST_SCHEMA` defaults. A user typing "drop table demo" will hit `mcp2ohio.test_writes.demo`. Acceptable per spec ("explicitly OR reliably resolve") but worth noting.
+3. **CREATE TABLE column DDL** is not pattern-matched in NL — must be entered as raw SQL with FQ name. Same for full MERGE statements.
+4. **`ALTER` is mapped to `execute_raw` permission** (not in any standard profile). Expect 403 unless the developer has `execute_raw=true`.
+5. **Latent bug at `app_jwt.py:706`:** `uvicorn.run("app:app", ...)` still references the wrong module — running `python app_jwt.py` directly loads `app.py`. Out of scope; launch via `python -m uvicorn app_jwt:app` works fine.
+6. **CORS open to `*`** — restrict before any non-local deployment.
+
+**Recommended next steps:**
+
+1. Surface NL DDL/DML in the frontend (`index.html`) — current chips are SELECT-only. Add a confirmation dialog tied to `requires_confirm: true` responses.
+2. Add NL patterns for `ALTER TABLE ... ADD/DROP COLUMN` and `RENAME TABLE` — common ops with simple grammars.
+3. Replace single-developer mode with per-session identity (JWT claim → developer name).
+4. Fix the line-706 self-launch bug.
+5. Move `_developer` resolution into a request-time context so future per-session perms can plug in cleanly.
+6. Audit the destructive list — consider gating `update` without `WHERE` clauses (currently a missing-WHERE update silently affects all rows — Trino allows it).
+
+**Status:** ✅ Feature complete, all 62 unit tests + 6 integration tests + 8 live smoke tests pass. uvicorn is running at http://127.0.0.1:8000/.
+
+---
+
+## SESSION 2026-05-09 (continued) — Business-user NL INSERT grammar
+
+### BEFORE state (logged 2026-05-09T15:55Z)
+
+**Goal:** Support a business-user-friendly NL phrasing for INSERT, on top of the existing developer-SQL forms. Three example inputs to recognize:
+1. `Add a new row into catalog mcp2ohio, schema test_writes, table demo with id 777, name nl_test, and amount 7.7`
+2. `Insert a record into mcp2ohio.test_writes.demo where id = 888, name = cols_form, and amount = 1.5`
+3. `In catalog mcp2ohio, schema test_writes, add a row to table demo with id 901, name fq_form, and amount 9.99`
+
+**Constraint:** "Do not guess missing database object context" — so the new NL parser MUST require explicit catalog/schema/table (no default fallback). Existing developer SQL forms (which DO use defaults) keep working unchanged.
+
+**Plan:**
+1. Backup app_jwt.py with timestamp + comment header.
+2. Add `_NL_INSERT_TRIGGER` regex (matches: `^add (a)? (new)? row|record`, `^insert (a)? (new)? row|record`, `^in catalog`).
+3. Add `_render_value(raw)` — quote/cast helper for values (string/int/float/null/bool, strips surrounding `"` `'` ` ` ).
+4. Add `_nl_insert_to_sql(msg, default_catalog, default_schema)` — extracts target via dotted-form OR verbose phrases (`catalog X / schema Y / table Z`), parses col-value pairs from the segment after `with|where|having`, validates each identifier, renders SQL.
+5. Insert the trigger check at the top of `_nl_to_sql` so it runs before the dot-passthrough that would mis-classify "Insert a record into …" as raw SQL.
+6. Add tests for: all three sample prompts; missing catalog/schema/table; missing values; quoted values; numeric/null/bool values; existing dev-SQL forms unchanged.
+7. Restart uvicorn and smoke-test live.
+
+### AFTER state (logged 2026-05-09T16:25Z — completion)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_NL_INSERT_TRIGGER`, `_render_value`, `_nl_insert_to_sql`; trigger check at top of `_nl_to_sql`; `try/except FQValidationError` around `_nl_to_sql` in `/api/chat`. Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260509_232040.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 10 new tests covering happy paths, rejection cases, dev-SQL preservation.
+
+**Tests:** 72 unit tests + 6 integration = 78 passing, 0 failing.
+
+**Live smoke tests (8 cases, all green):**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| 1 | `Add a new row into catalog mcp2ohio, schema test_writes, table demo with id 7777, name nl_smoke_v, and amount 7.77` | rows_affected=1 | ✅ INSERT INTO mcp2ohio.test_writes.demo (id, name, amount) VALUES (7777, 'nl_smoke_v', 7.77), rows_affected=1 |
+| 2 | `Insert a record into mcp2ohio.test_writes.demo where id = 8888, name = nl_smoke_d, and amount = 1.5` | rows_affected=1 | ✅ rows_affected=1 |
+| 3 | `In catalog mcp2ohio, schema test_writes, add a row to table demo with id 9999, name nl_smoke_s, and amount 9.99` | rows_affected=1 | ✅ rows_affected=1 |
+| 4 | `Add a new row into catalog mcp2ohio, table demo with id 1, name a` (missing schema) | 400 fq_validation | ✅ HTTP 400, "Could not resolve schema..." |
+| 5 | `Add a new row into catalog mcp2ohio, schema test_writes, table demo` (no values) | 400 fq_validation | ✅ HTTP 400, "Could not find column values..." |
+| 6 | `INSERT INTO mcp2ohio.test_writes.demo VALUES (10101, 'dev_sql_fq', 1.01)` | rows_affected=1 | ✅ existing dev SQL still works |
+| 7 | `insert into demo (id, name, amount) values (20202, 'dev_sql_bare', 2.02)` | rows_affected=1 | ✅ bare-name auto-qualify still works |
+| 8 | `show all tables` | row_count=5 | ✅ SELECT regression clean |
+
+All 5 smoke rows cleaned up (single NL DELETE with confirm: `delete from demo where id in (7777,8888,9999,10101,20202)` → 5 rows).
+
+**Status:** ✅ Feature complete. uvicorn at http://127.0.0.1:8000/.
+
+---
+
+## SESSION 2026-05-09 (continued) — Clarification: placeholder vs real cluster objects
+
+### Issue logged
+
+User tested the prompt:
+```
+Add a record into catalog c, schema s, table t with a 1, b null, c true
+```
+
+**Observed:**
+- Generated SQL: `INSERT INTO c.s.t (a, b, c) VALUES (1, NULL, TRUE)` — correct
+- HTTP 400, Trino error: `TABLE_NOT_FOUND ... Table 'c.s.t' does not exist`
+
+**Root cause:** the prompt was a syntactic/unit-test demo using placeholder identifiers `c`/`s`/`t`. Those objects don't exist on the live `mcp2ohio` cluster — the cluster correctly rejected the insert.
+
+**Resolution:** to actually execute the prompt, replace placeholders with real cluster objects:
+```
+Add a record into catalog mcp2ohio, schema test_writes, table demo with id 1, name null, amount 7.7
+→ INSERT INTO mcp2ohio.test_writes.demo (id, name, amount) VALUES (1, NULL, 7.7)  → rows_affected=1
+```
+
+The `demo` table has no boolean column. To exercise `true`/`false` value rendering, create a table with a BOOLEAN column first:
+```
+CREATE TABLE mcp2ohio.test_writes.bool_demo (a INTEGER, b VARCHAR, c BOOLEAN)
+Add a record into catalog mcp2ohio, schema test_writes, table bool_demo with a 1, b null, c true
+→ INSERT INTO mcp2ohio.test_writes.bool_demo (a, b, c) VALUES (1, NULL, TRUE)
+```
+
+**Diagnosis pattern documented:**
+1. Inspect the `sql` field in any response — that's what was sent to Trino.
+2. Read the `detail` field for Trino's error category (TABLE_NOT_FOUND / COLUMN_NOT_FOUND / TYPE_MISMATCH / ACCESS_DENIED).
+3. Use `/api/schema` or `describe <table>` to confirm what objects/columns exist.
+
+---
+
+## SESSION 2026-05-09 (continued) — Business-user NL UPDATE grammar
+
+### BEFORE state
+
+**Goal:** Add a business-user-friendly NL UPDATE grammar parallel to the NL INSERT one. Three target prompts:
+1. `In catalog mcp2ohio, schema test_writes, table demo, update the row where id = 2 and set name to updated_via_nl`
+2. `Change amount to 1500.5 in catalog mcp2ohio, schema test_writes, table demo for the row where name = 'hello'`
+3. `Update mcp2ohio.test_writes.demo and set amount = 999 where id = 888`
+
+**Existing UPDATE coverage:**
+- Raw SQL passthrough: works (e.g. `UPDATE mcp2ohio.test_writes.demo SET amount=999 WHERE id=888`)
+- Simple NL pattern at `_nl_to_sql`: `update\s+([\w.]+)\s+set\s+(.+?)(?:\s+where\s+(.+))?$` — handles `update demo set name='x' where id=1` but **fails** on the verbose business forms because of words like "the row", "and set", or "change ... to ...".
+- Existing pattern also allows missing WHERE (would update all rows silently).
+
+**Plan:**
+1. Backup `app_jwt.py` with timestamp + comment header.
+2. Refine `_NL_INSERT_TRIGGER` so the `^in catalog ...` branch requires an `add|insert` verb later (avoids overlap with UPDATE's `^in catalog ...` branch).
+3. Add `_NL_UPDATE_TRIGGER` (matches `change <col> to`, `update the row|record`, `update X.Y.Z and set`, and `^in catalog ... update|change`).
+4. Add `_nl_update_to_sql(message)` parser:
+   - Resolve target via inline dotted form OR verbose `catalog/schema/table` phrases.
+   - Extract one or more SET pairs via `set <col> to|= <val>`, `and set <col> to|= <val>`, or `change <col> to <val>`.
+   - Extract WHERE clause (mandatory; reject if missing).
+   - Validate identifiers; render values via existing `_render_value`.
+5. Wire into `_nl_to_sql` after the INSERT trigger check.
+6. Add tests for happy paths (3 spec examples + multi-set), and rejections (missing WHERE / missing schema / reserved-word column / no SET).
+7. Restart uvicorn and smoke-test live.
+
+**Constraint:** mandatory WHERE for the new business-NL form (per spec: "missing or unsafe filter conditions" → reject). Existing simple SQL pattern left alone for technical-user passthrough.
+
+### AFTER state (UPDATE feature complete)
+
+**Files changed:**
+- `gen-ai-project/starburst-mcp2/app_jwt.py` — added `_NL_UPDATE_TRIGGER`, `_SET_PAIR_RE`, `_CHANGE_PAIR_RE`, `_WHERE_RE`, `_nl_update_to_sql()`. Refined `_NL_INSERT_TRIGGER` so its `^in catalog ...` branch requires `add|insert ... row|record` later (prevents collision with UPDATE's `^in catalog ...` branch). Backup: `gen-ai-project/starburst-mcp2/backup/app_jwt.20260509_235603.bak.py`.
+- `gen-ai-project/starburst-mcp2/tests/test_app_jwt_nl.py` — added 11 UPDATE-specific tests.
+
+**Tests:** 83 unit tests pass (11 new + 72 prior). 0 failures.
+
+**Live smoke tests on `/api/chat`:**
+
+| # | Input | Expected | Actual |
+|---|---|---|---|
+| 0 | seed: `Add a record into catalog mcp2ohio, schema test_writes, table demo with id 4242, name initial_value, amount 1.00` | rows_affected=1 | ✅ |
+| 1 | `In catalog mcp2ohio, schema test_writes, table demo, update the row where id = 4242 and set name to updated_via_nl` | rows_affected=1, FQ UPDATE generated | ✅ `UPDATE mcp2ohio.test_writes.demo SET name = 'updated_via_nl' WHERE id = 4242` |
+| 2 | `Change amount to 1500.5 in catalog mcp2ohio, schema test_writes, table demo for the row where name = 'updated_via_nl'` | rows_affected ≥1 | ✅ `UPDATE ... SET amount = 1500.5 WHERE name = 'updated_via_nl'` (2 rows hit; pre-existing row from earlier session) |
+| 3 | `Update mcp2ohio.test_writes.demo and set amount = 999 where id = 4242` | rows_affected=1 | ✅ `UPDATE ... SET amount = 999 WHERE id = 4242` |
+| 4 | missing WHERE: `Update mcp2ohio.test_writes.demo and set amount = 999` | HTTP 400 | ✅ "UPDATE requires a WHERE clause..." |
+| 5 | missing schema: `In catalog mcp2ohio, table demo, update the row where id=1 and set name to a` | HTTP 400 | ✅ "Could not resolve schema..." |
+| 6 | missing SET: `In catalog mcp2ohio, schema test_writes, table demo, update the row where id = 1` | HTTP 400 | ✅ "UPDATE requires a SET clause..." |
+| 7 | dev SQL: `UPDATE mcp2ohio.test_writes.demo SET amount=11.11 WHERE id=4242` | rows_affected=1 | ✅ unchanged behavior |
+| 8 | simple NL: `update demo set name='nl_simple' where id=4242` | rows_affected=1 | ✅ unchanged behavior |
+| 9 | cleanup: `delete from demo where id=4242 (confirm=true)` | rows_affected=1 | ✅ |
+
+**Status:** ✅ Feature complete. uvicorn at http://127.0.0.1:8000/.

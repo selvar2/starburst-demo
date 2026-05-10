@@ -103,7 +103,7 @@ Both share a JWT-based headless auth path, a per-developer permission layer, and
 ```bash
 # 1. Clone
 git clone https://github.com/<ORG>/starburst-demo.git
-cd starburst-demo/"gen ai project/starburst-mcp2"
+cd starburst-demo/"gen-ai-project/starburst-mcp2"
 
 # 2. Create virtualenv
 python -m venv .venv
@@ -153,7 +153,7 @@ Register in `.mcp.json` at your repo root (or `~/.claude/settings.json`):
     "starburst-rw": {
       "type": "stdio",
       "command": "python",
-      "args": ["./gen ai project/starburst-mcp2/server.py"]
+      "args": ["./gen-ai-project/starburst-mcp2/server.py"]
     }
   }
 }
@@ -198,7 +198,7 @@ Central    |  756100
 Start the server:
 
 ```bash
-cd "gen ai project/starburst-mcp2"
+cd "gen-ai-project/starburst-mcp2"
 python -m uvicorn app_jwt:app --port 8000
 # → open http://localhost:8000
 ```
@@ -330,7 +330,7 @@ Current suite: **14 unit + 6 integration = 20 tests, all pass**.
 
 ```
 .
-├── gen ai project/starburst-mcp2/
+├── gen-ai-project/starburst-mcp2/
 │   ├── server.py                 # MCP entry point
 │   ├── app.py / app_jwt.py       # FastAPI (browser OAuth / headless JWT)
 │   ├── index.html                # StarQuery UI
@@ -359,10 +359,10 @@ Current suite: **14 unit + 6 integration = 20 tests, all pass**.
 FROM python:3.12-slim
 WORKDIR /app
 COPY . .
-RUN pip install -r "gen ai project/starburst-mcp2/requirements.txt" \
+RUN pip install -r "gen-ai-project/starburst-mcp2/requirements.txt" \
                  fastapi "uvicorn[standard]" openpyxl python-multipart
 CMD ["python", "-m", "uvicorn", "app_jwt:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--app-dir", "gen ai project/starburst-mcp2"]
+     "--app-dir", "gen-ai-project/starburst-mcp2"]
 ```
 
 Mount `.env` as a secret; never bake credentials into the image.
@@ -404,4 +404,4 @@ Mount `.env` as a secret; never bake credentials into the image.
 
 ---
 
-_Documentation generated 2026-04-20. For design rationale and historical decisions, see [`docs/superpowers/Enterprise_Documentation.md`](gen%20ai%20project/starburst-mcp2/docs/superpowers/Enterprise_Documentation.md) and [`docs/superpowers/End_User_Documentation.md`](gen%20ai%20project/starburst-mcp2/docs/superpowers/End_User_Documentation.md)._
+_Documentation generated 2026-04-20. For design rationale and historical decisions, see [`docs/superpowers/Enterprise_Documentation.md`](gen-ai-project/starburst-mcp2/docs/superpowers/Enterprise_Documentation.md) and [`docs/superpowers/End_User_Documentation.md`](gen-ai-project/starburst-mcp2/docs/superpowers/End_User_Documentation.md)._

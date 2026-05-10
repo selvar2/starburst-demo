@@ -140,7 +140,7 @@ After today's session, the `demo` table has:
   ```
 
 ### "Cannot connect to Starburst"
-- Check that the `.env` file exists in the `gen ai project/starburst-mcp2/` folder
+- Check that the `.env` file exists in the `gen-ai-project/starburst-mcp2/` folder
 - The `.env` file contains your login information — it may need to be recreated after a full rebuild
 
 ### "OAuth popup still appearing"

@@ -1,99 +1,58 @@
-# Starburst MCP2 — Project Instructions
+# StarQuery AI Agent Guidelines
 
-## MANDATORY: Read Before Any Action
+## Project AI Guidelines
 
-**Session memory file:** `~/.claude/projects/c--Users-Lenovo/memory/starburst-mcp2-session.md`
-Read this file at the START of every conversation to understand current project state.
+StarQuery AI serves both technical SQL users and non-technical business users. Technical users may enter SQL directly. Business users may enter natural language, which should be converted to validated SQL through the LLM layer when enabled.
 
----
+Agents working on this project must preserve the existing authentication flow, theme, exports, charting behavior, and permission model. Prefer additive, feature-flagged changes over rewrites.
 
-## Development Protocol
+## LLM Prompting Rules
 
-### Pre-Execution Logging (NON-NEGOTIABLE)
+- Always include current catalog, schema, table, and column context.
+- State the SQL dialect explicitly as Trino/Starburst unless another database adapter is selected.
+- Ask the model for JSON only; do not parse prose when structured output is required.
+- Require the model to name assumptions and confidence.
+- Require generated SQL to be a single statement.
+- Require `LIMIT` for exploratory row-returning queries.
+- Do not allow the model to invent tables or columns outside provided metadata.
+- Use few-shot examples for common BI asks: top N, time series, regional filters, KPI summaries, and dashboard requests.
 
-Before executing ANY code, CLI command, API call, or automation:
-1. **Log the action** to the session memory file with timestamp, action type, purpose, and code/command
-2. **Execute** the action
-3. **Log the result** — including full errors, never skip failures
-4. **Log next step** — what comes after this action
+## SQL Safety Rules
 
-If logging fails or is skipped → STOP development and fix logging first.
+- Never execute raw user text as SQL after LLM transformation without validation.
+- Preserve direct SQL support for technical users, but still classify permissions.
+- Generated business-user SQL defaults to read-only `SELECT` unless the user explicitly asks for a write.
+- Block multi-statement SQL and unsafe comments.
+- Block `DROP`, `TRUNCATE`, `ALTER`, `GRANT`, `REVOKE`, and write statements from the LLM read flow.
+- Validate referenced tables and columns against metadata when metadata is available.
+- Inject a conservative `LIMIT` when a generated `SELECT` has no limit.
+- Keep destructive operations behind `context.confirm=true`.
 
-### Action Classification
+## Architecture Constraints
 
-Every action must be tagged with one of:
-- `CODE` — writing/modifying source files
-- `CLI` — terminal commands (npm, git, etc.)
-- `API` — HTTP requests, external service calls
-- `CONFIG` — environment, settings, configuration changes
-- `DESIGN` — architectural decisions, system design changes
+- `app_jwt.py` remains the FastAPI entry point.
+- `starburst_client_jwt.py` authentication must not be replaced in this migration.
+- New AI logic belongs in dedicated service modules.
+- Provider-specific code belongs only in provider adapters.
+- Prompt text belongs in `prompts.py`, not route handlers.
+- UI additions must match the existing single-file theme and should be compact.
+- No API keys, tokens, passwords, or tenant secrets may be committed.
 
-### Chain of Thought (Required Before Every Action)
+## Coding Standards
 
-1. **UNDERSTAND** — What is the task? How does it fit the project?
-2. **BASICS** — Dependencies, inputs, expected outputs
-3. **BREAK DOWN** — Pre-action → Execution → Post-action
-4. **ANALYZE** — Verify correctness, check for risks
-5. **BUILD** — Write to session memory BEFORE execution
-6. **EXECUTE** — Run it
-7. **EDGE CASES** — Capture errors fully, prepare fix iteration
-8. **FINAL ANSWER** — Log result, observations, next step
+- Use Python type hints for new modules.
+- Use dataclasses or Pydantic models for structured service contracts.
+- Keep functions small and single-purpose.
+- Use structured exceptions for expected validation/provider failures.
+- Avoid broad rewrites of existing regex behavior unless tests require it.
+- Preserve backwards compatibility in API response fields.
+- Add tests for new behavior before relying on it.
 
----
+## Agent Behavior Rules
 
-## Session Memory File Structure
-
-The session memory file (`starburst-mcp2-session.md`) follows this structure:
-
-```
-# PROJECT MEMORY FILE
-## PROJECT OVERVIEW (goal, description, tech stack)
-## CURRENT STATE (completed, in progress, known issues)
-## SESSION LOGS (timestamped entries with pre/post execution)
-## KNOWN PATTERNS / DECISIONS
-## SECURITY NOTES
-## RECOVERY INSTRUCTIONS
-```
-
-### Entry Format (Every Action)
-
-```
-### [YYYY-MM-DD HH:MM]
-#### ACTION TYPE: CODE / CLI / API / CONFIG / DESIGN
-#### PURPOSE: (why this action is performed)
-#### PRE-EXECUTION
-<code or command>
-#### EXECUTION RESULT
-<output>
-#### STATUS: SUCCESS / FAILURE
-#### OBSERVATIONS: (what happened, insights)
-#### NEXT STEP: (what will be done next)
-```
-
----
-
-## Strict Rules
-
-- NEVER execute code before logging it to session memory
-- NEVER omit errors — log full output including stack traces
-- NEVER summarize instead of logging raw output (no "fixed bug" — log what was fixed and how)
-- NEVER store unmasked API keys or secrets (mask like: `sk-****1234`)
-- NEVER skip failed attempts — every iteration matters for recovery
-- NEVER assume context without writing it down
-- ALWAYS update CURRENT STATE section after completing a milestone
-- ALWAYS update RECOVERY INSTRUCTIONS when the resume path changes
-
-## Security
-
-- Mask all API keys, tokens, and secrets in logs
-- Never commit `.env` files or credentials
-- Use environment variables for sensitive configuration
-
-## Recovery Protocol
-
-If starting a new session or resuming after interruption:
-1. Read this CLAUDE.md file
-2. Read the session memory file: `~/.claude/projects/c--Users-Lenovo/memory/starburst-mcp2-session.md`
-3. Check CURRENT STATE section
-4. Read the latest SESSION LOG entry
-5. Execute the NEXT STEP from that entry
+- Read relevant files before editing.
+- Update documentation when adding environment variables or service behavior.
+- Run focused tests after backend changes.
+- If live Starburst credentials are unavailable or network is blocked, state that clearly and rely on unit tests.
+- Treat existing uncommitted changes as user-owned.
+- Prefer rollback-friendly feature flags.

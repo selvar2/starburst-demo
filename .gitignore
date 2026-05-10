@@ -5,3 +5,8 @@ brutally-honest-advisor.txt
 __pycache__/
 *.pyc
 .env
+.deps/
+.venv/
+.tmp/
+backup/
+backups/
