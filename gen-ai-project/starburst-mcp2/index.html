@@ -159,10 +159,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .kpi-sub{font-size:.78rem;line-height:1.35;color:var(--text);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chart-narration{margin:0;padding:12px 14px;border-left:3px solid var(--accent1);background:rgba(0,0,0,.14);border-radius:7px;color:var(--text);font-size:.86rem;line-height:1.5;max-width:86ch}
 @media(max-width:700px){.ai-insights{padding:14px}.kpi-grid,.dashboard-hints{grid-template-columns:1fr}.ai-pill{white-space:normal}.kpi-card{min-height:104px}}
-.suggestions-row{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 4px 52px;animation:fadeUp .3s ease}
-.suggestion-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:.8rem;cursor:pointer;transition:all .25s;white-space:nowrap}
-.suggestion-chip:hover{border-color:var(--purple);color:var(--text);background:rgba(168,85,247,.1);transform:translateY(-1px);box-shadow:0 4px 12px rgba(168,85,247,.15)}
-.chip-icon{font-size:.9rem}
+.suggestions-row{display:flex;flex-wrap:wrap;gap:10px;padding:14px 0 6px 52px;animation:fadeUp .3s ease}
+.suggestion-chip{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:24px;border:1px solid rgba(168,85,247,.5);background:linear-gradient(135deg,rgba(168,85,247,.18),rgba(59,130,246,.14));color:#f8fafc;font-size:.86rem;font-weight:750;letter-spacing:.01em;cursor:pointer;transition:all .25s;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.04)}
+.suggestion-chip:hover,.suggestion-chip:focus-visible{border-color:rgba(6,182,212,.9);color:#fff;background:linear-gradient(135deg,rgba(168,85,247,.32),rgba(59,130,246,.28));transform:translateY(-2px);box-shadow:0 8px 22px rgba(59,130,246,.28),0 0 0 2px rgba(6,182,212,.22);outline:none}
+[data-theme="light"] .suggestion-chip{border-color:rgba(147,51,234,.42);background:linear-gradient(135deg,rgba(147,51,234,.13),rgba(37,99,235,.1));color:#111827;box-shadow:0 8px 20px rgba(37,99,235,.12),inset 0 0 0 1px rgba(255,255,255,.85)}
+[data-theme="light"] .suggestion-chip:hover,[data-theme="light"] .suggestion-chip:focus-visible{border-color:rgba(37,99,235,.72);color:#0f172a;background:linear-gradient(135deg,rgba(147,51,234,.2),rgba(37,99,235,.17));box-shadow:0 9px 22px rgba(37,99,235,.2),0 0 0 2px rgba(147,51,234,.16)}
+.chip-icon{font-size:1rem;line-height:1}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 /* Chart */
@@ -796,6 +798,102 @@ function fqLocation(fq){
   return parts.length>=3?parts.slice(0,2).join('.'):fq;
 }
 
+function cleanMetricName(col){
+  return String(col||'').replace(/^(total|sum|avg|average|min|max|count)_/i,'').replace(/_total$/i,'');
+}
+
+function isNumericValue(v){
+  return typeof v==='number'||(typeof v==='string'&&v.trim()!==''&&!Number.isNaN(Number(v)));
+}
+
+function isLikelyDimension(col,value){
+  const c=String(col||'').toLowerCase();
+  return typeof value==='string'||c.includes('date')||c.includes('time')||c.includes('month')||c.includes('year')||c.includes('quarter')||c.includes('region')||c.includes('segment')||c.includes('category')||c.includes('status')||c.includes('channel')||c.includes('product')||c.includes('customer');
+}
+
+function isLikelyMeasure(col,value){
+  const c=String(col||'').toLowerCase();
+  if(c==='id'||c.endsWith('_id')||c.includes('year')||c.includes('quarter'))return false;
+  return isNumericValue(value)||/(revenue|sales|profit|amount|value|cost|expense|units|count|accounts|customers|margin|rate|score|stock|pipeline|forecast|actual|target|growth)/.test(c);
+}
+
+function preferredSort(cols){
+  const priority=['revenue','gross_profit','profit','sales','actual','forecast','pipeline','accounts','customers','units','value','amount','growth','rate','margin','score','stock'];
+  return [...cols].sort((a,b)=>{
+    const al=String(a).toLowerCase(); const bl=String(b).toLowerCase();
+    const ap=priority.findIndex(p=>al.includes(p)); const bp=priority.findIndex(p=>bl.includes(p));
+    return (ap<0?99:ap)-(bp<0?99:bp)||al.localeCompare(bl);
+  });
+}
+
+function addUniqueSuggestion(suggestions,label,sql){
+  if(!label||!sql)return;
+  const key=label.toLowerCase();
+  if(!suggestions.some(s=>String(s.label||s).toLowerCase()===key))suggestions.push({label,sql});
+}
+
+function chartableDemoSuggestions(){
+  return [
+    {label:'Revenue by region',sql:'SELECT region, SUM(revenue) AS total_revenue FROM mcp2ohio.test_writes.regional_sales GROUP BY region ORDER BY total_revenue DESC LIMIT 100'},
+    {label:'Gross profit by region',sql:'SELECT region, SUM(gross_profit) AS total_gross_profit FROM mcp2ohio.test_writes.regional_sales GROUP BY region ORDER BY total_gross_profit DESC LIMIT 100'},
+    {label:'Revenue trend by month',sql:'SELECT period_month, SUM(revenue) AS total_revenue FROM mcp2ohio.test_writes.monthly_sales GROUP BY period_month ORDER BY period_month LIMIT 100'},
+    {label:'Revenue by product',sql:'SELECT product_name, SUM(revenue) AS total_revenue FROM mcp2ohio.test_writes.product_sales GROUP BY product_name ORDER BY total_revenue DESC LIMIT 100'},
+    {label:'Revenue by customer segment',sql:'SELECT customer_segment, SUM(revenue) AS total_revenue FROM mcp2ohio.test_writes.customer_sales GROUP BY customer_segment ORDER BY total_revenue DESC LIMIT 100'},
+    {label:'KPI actual vs target',sql:'SELECT kpi_name, actual_value, target_value FROM mcp2ohio.test_writes.kpi_metrics ORDER BY actual_value DESC LIMIT 100'}
+  ];
+}
+
+function chartableSuggestionsFromResult(data,fq){
+  if(!fq)return [];
+  const cols=data.columns||[];
+  const rows=data.rows||[];
+  const sample=rows[0]||[];
+  const dimensions=cols.filter((c,i)=>isLikelyDimension(c,sample[i])&&!isLikelyMeasure(c,sample[i])).slice(0,3);
+  let measures=preferredSort(cols.filter((c,i)=>isLikelyMeasure(c,sample[i])).map(cleanMetricName));
+  measures=[...new Set(measures)].slice(0,4);
+  const suggestions=[];
+  dimensions.forEach(dim=>{
+    measures.forEach(metric=>{
+      const alias=`total_${metric}`;
+      addUniqueSuggestion(
+        suggestions,
+        `${metric.replace(/_/g,' ')} by ${dim.replace(/_/g,' ')}`,
+        `SELECT ${dim}, SUM(${metric}) AS ${alias} FROM ${fq} GROUP BY ${dim} ORDER BY ${alias} DESC LIMIT 100`
+      );
+    });
+  });
+  return suggestions;
+}
+
+function knownTableChartSuggestions(table,fq){
+  const t=String(table||'').toLowerCase();
+  const byName={
+    regional_sales:[
+      ['Revenue by region',`SELECT region, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY region ORDER BY total_revenue DESC LIMIT 100`],
+      ['Gross profit by region',`SELECT region, SUM(gross_profit) AS total_gross_profit FROM ${fq} GROUP BY region ORDER BY total_gross_profit DESC LIMIT 100`],
+      ['Strategic accounts by region',`SELECT region, SUM(strategic_accounts) AS total_strategic_accounts FROM ${fq} GROUP BY region ORDER BY total_strategic_accounts DESC LIMIT 100`]
+    ],
+    monthly_sales:[
+      ['Revenue trend by month',`SELECT period_month, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY period_month ORDER BY period_month LIMIT 100`],
+      ['Pipeline value by month',`SELECT period_month, SUM(pipeline_value) AS total_pipeline_value FROM ${fq} GROUP BY period_month ORDER BY period_month LIMIT 100`]
+    ],
+    product_sales:[
+      ['Revenue by product',`SELECT product_name, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY product_name ORDER BY total_revenue DESC LIMIT 100`],
+      ['Units sold by product',`SELECT product_name, SUM(units_sold) AS total_units_sold FROM ${fq} GROUP BY product_name ORDER BY total_units_sold DESC LIMIT 100`]
+    ],
+    customer_sales:[
+      ['Revenue by customer segment',`SELECT customer_segment, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY customer_segment ORDER BY total_revenue DESC LIMIT 100`],
+      ['Customer count by region',`SELECT region, SUM(customer_count) AS total_customer_count FROM ${fq} GROUP BY region ORDER BY total_customer_count DESC LIMIT 100`]
+    ],
+    sales_fact:[
+      ['Revenue by region',`SELECT region, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY region ORDER BY total_revenue DESC LIMIT 100`],
+      ['Revenue by product',`SELECT product_name, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY product_name ORDER BY total_revenue DESC LIMIT 100`],
+      ['Revenue trend by month',`SELECT period_month, SUM(revenue) AS total_revenue FROM ${fq} GROUP BY period_month ORDER BY period_month LIMIT 100`]
+    ]
+  };
+  return (byName[t]||[]).map(([label,sql])=>({label,sql}));
+}
+
 function getSuggestions(data){
   const sql=(data.sql||'');
   const sqlUp=sql.toUpperCase();
@@ -803,90 +901,65 @@ function getSuggestions(data){
   const rows=data.rows||[];
   const suggestions=[];
   if(Array.isArray(data.followups)){
-    data.followups.slice(0,3).forEach(f=>suggestions.push({label:f,sql:f}));
+    data.followups.slice(0,3).forEach(f=>addUniqueSuggestion(suggestions,f,f));
   }
   const fq=getFQTable(sql);
+  chartableSuggestionsFromResult(data,fq).forEach(s=>addUniqueSuggestion(suggestions,s.label,s.sql));
 
   // After SHOW TABLES
   if(sqlUp.includes('SHOW TABLES')){
     const schemaMatch=sql.match(/FROM\s+(\w+\.\w+)/i);
     const prefix=schemaMatch?schemaMatch[1]:'mcp2ohio.test_writes';
-    rows.slice(0,3).forEach(r=>{
+    rows.forEach(r=>{
       const t=r[0];
-      suggestions.push({label:`Describe ${t} (${prefix})`,         sql:`DESCRIBE ${prefix}.${t}`});
-      suggestions.push({label:`Show all data from ${t} (${prefix})`,sql:`SELECT * FROM ${prefix}.${t} LIMIT 100`});
+      knownTableChartSuggestions(t,`${prefix}.${t}`).forEach(s=>addUniqueSuggestion(suggestions,s.label,s.sql));
     });
-    return suggestions.slice(0,6);
+    return (suggestions.length?suggestions:chartableDemoSuggestions()).slice(0,8);
   }
 
   // After DESCRIBE
   if(sqlUp.includes('DESCRIBE')){
     if(fq){
       const tName=fq.split('.').pop();
-      const loc=fqLocation(fq);
-      suggestions.push({label:`Show all data from ${tName} (${fq})`,  sql:`SELECT * FROM ${fq} LIMIT 100`});
-      suggestions.push({label:`Count rows in ${tName} (${fq})`,       sql:`SELECT COUNT(*) FROM ${fq}`});
+      knownTableChartSuggestions(tName,fq).forEach(s=>addUniqueSuggestion(suggestions,s.label,s.sql));
       const numCols=rows.filter(r=>String(r[1]||'').toLowerCase().match(/int|double|decimal|float|bigint|real/)).map(r=>r[0]);
-      numCols.slice(0,2).forEach(c=>{
-        suggestions.push({label:`Group by ${c} in ${tName} (${fq})`,  sql:`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`});
+      const dimCols=rows.filter(r=>String(r[1]||'').toLowerCase().match(/char|varchar|date|time/)||/(region|segment|product|customer|channel|status|month|quarter|year)/i.test(String(r[0]||''))).map(r=>r[0]);
+      const dims=dimCols.length?dimCols.slice(0,2):['region'];
+      dims.forEach(dim=>{
+        numCols.slice(0,3).forEach(metric=>{
+          const alias=`total_${metric}`;
+          addUniqueSuggestion(suggestions,`${metric.replace(/_/g,' ')} by ${dim.replace(/_/g,' ')}`,`SELECT ${dim}, SUM(${metric}) AS ${alias} FROM ${fq} GROUP BY ${dim} ORDER BY ${alias} DESC LIMIT 100`);
+        });
       });
-      if(numCols.length){
-        suggestions.push({label:`Sum of ${numCols[0]} in ${tName} (${fq})`, sql:`SELECT SUM(${numCols[0]}) FROM ${fq}`});
-      }
     }
-    return suggestions.slice(0,6);
+    return (suggestions.length?suggestions:chartableDemoSuggestions()).slice(0,8);
   }
 
   // After SELECT *
   if(sqlUp.includes('SELECT *')){
     if(fq){
       const tName=fq.split('.').pop();
-      const loc=fqLocation(fq);
-      suggestions.push({label:`Count rows in ${tName} (${fq})`,    sql:`SELECT COUNT(*) FROM ${fq}`});
-      suggestions.push({label:`Describe ${tName} (${fq})`,          sql:`DESCRIBE ${fq}`});
-      cols.forEach((c,i)=>{
-        if(rows.length>0&&typeof rows[0][i]==='string'&&c.toLowerCase()!=='id'){
-          suggestions.push({label:`Group by ${c} · ${tName} (${fq})`, sql:`SELECT ${c}, COUNT(*) FROM ${fq} GROUP BY ${c}`});
-        }
-      });
-      cols.forEach((c,i)=>{
-        if(rows.length>0&&typeof rows[0][i]==='number'&&c.toLowerCase()!=='id'){
-          suggestions.push({label:`Sum of ${c} · ${tName} (${fq})`,    sql:`SELECT SUM(${c}) FROM ${fq}`});
-          suggestions.push({label:`Average of ${c} · ${tName} (${fq})`,sql:`SELECT AVG(${c}) FROM ${fq}`});
-        }
-      });
+      knownTableChartSuggestions(tName,fq).forEach(s=>addUniqueSuggestion(suggestions,s.label,s.sql));
     }
-    return suggestions.slice(0,6);
+    return (suggestions.length?suggestions:chartableDemoSuggestions()).slice(0,8);
   }
 
   // After COUNT/SUM/AVG/aggregation
-  if(sqlUp.match(/SELECT\s+(COUNT|SUM|AVG|MIN|MAX)\(/)){
+  if(sqlUp.match(/\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/)){
     if(fq){
       const tName=fq.split('.').pop();
-      const loc=fqLocation(fq);
-      suggestions.push({label:`Show all data from ${tName} (${fq})`, sql:`SELECT * FROM ${fq} LIMIT 100`});
-      suggestions.push({label:`Describe ${tName} (${fq})`,            sql:`DESCRIBE ${fq}`});
-      suggestions.push({label:`Show all tables in ${loc}`,              sql:`SHOW TABLES FROM ${loc}`});
+      knownTableChartSuggestions(tName,fq).forEach(s=>addUniqueSuggestion(suggestions,s.label,s.sql));
     }
-    return suggestions;
+    return (suggestions.length?suggestions:chartableDemoSuggestions()).slice(0,8);
   }
 
   // After SHOW SCHEMAS
-  if(sql.includes('SHOW SCHEMAS')){
-    return [
-      {label:`Show all tables in mcp2ohio.test_writes`,                              sql:`SHOW TABLES FROM mcp2ohio.test_writes`},
-      {label:`Describe demo (mcp2ohio.test_writes.demo)`,                            sql:`DESCRIBE mcp2ohio.test_writes.demo`},
-      {label:`Show all data from demo (mcp2ohio.test_writes.demo)`,                  sql:`SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100`}
-    ];
+  if(sqlUp.includes('SHOW SCHEMAS')){
+    return chartableDemoSuggestions();
   }
 
   // Default fallback
-  return [
-    {label:`Show all tables in mcp2ohio.test_writes`,                                sql:`SHOW TABLES FROM mcp2ohio.test_writes`},
-    {label:`Describe demo (mcp2ohio.test_writes.demo)`,                              sql:`DESCRIBE mcp2ohio.test_writes.demo`},
-    {label:`Show all data from demo (mcp2ohio.test_writes.demo)`,                    sql:`SELECT * FROM mcp2ohio.test_writes.demo LIMIT 100`},
-    {label:`Count rows in demo (mcp2ohio.test_writes.demo)`,                         sql:`SELECT COUNT(*) FROM mcp2ohio.test_writes.demo`}
-  ];
+  return (suggestions.length?suggestions:chartableDemoSuggestions()).slice(0,8);
 }
 
 function renderTable(columns,rows,msgId){

@@ -7,6 +7,7 @@ hit the live Starburst cluster — `client.execute` is never called.
 
 import os
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -156,6 +157,34 @@ def test_nl_select_unchanged():
 
     sql = app_jwt._nl_to_sql("count rows in demo", "mcp2ohio", "test_writes")
     assert sql == "SELECT COUNT(*) FROM mcp2ohio.test_writes.demo"
+
+
+# ---------------------------------------------------------------------------
+# _suggest_chart — numeric aggregate types
+# ---------------------------------------------------------------------------
+
+def test_suggest_chart_handles_decimal_aggregates():
+    columns = ["region", "total_revenue", "total_gross_profit", "total_strategic_accounts"]
+    rows = [
+        ["West", Decimal("1200.50"), Decimal("300.25"), Decimal("4")],
+        ["East", Decimal("900.00"), Decimal("250.00"), Decimal("3")],
+    ]
+
+    assert app_jwt._suggest_chart(columns, rows) == "bar"
+
+
+@pytest.mark.parametrize(
+    "llm_chart,suggested,expected",
+    [
+        ("table", "bar", "bar"),
+        ("metric", "line", "line"),
+        ("line", "bar", "line"),
+        (None, "bar", "bar"),
+        ("unknown", "line", "line"),
+    ],
+)
+def test_final_chart_suggestion_prefers_chartable_shape(llm_chart, suggested, expected):
+    assert app_jwt._final_chart_suggestion(llm_chart, suggested) == expected
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import re
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from numbers import Number
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Response
@@ -245,6 +246,18 @@ def _enforce_destructive_confirm(perm_key: str, op_label: str, target: dict, con
 
 _DATE_KEYWORDS = {"date", "time", "timestamp", "day", "month", "year", "created", "updated"}
 
+def _is_numeric_value(value) -> bool:
+    return isinstance(value, Number) and not isinstance(value, bool)
+
+
+def _final_chart_suggestion(llm_chart: str | None, suggested: str) -> str:
+    allowed = {"bar", "pie", "line", "area", "table", "metric"}
+    if llm_chart not in allowed:
+        return suggested
+    if llm_chart in {"table", "metric"} and suggested not in {"table", "metric"}:
+        return suggested
+    return llm_chart
+
 def _suggest_chart(columns: list[str], rows: list[list]) -> str:
     if not columns or not rows:
         return "table"
@@ -263,18 +276,18 @@ def _suggest_chart(columns: list[str], rows: list[list]) -> str:
 
     # 2 columns: any type + number (group by results)
     if ncols == 2 and rows:
-        second_num = isinstance(rows[0][1], (int, float)) if rows[0] else False
+        second_num = _is_numeric_value(rows[0][1]) if rows[0] else False
         if second_num:
             return "pie" if len(rows) < 8 else "bar"
 
     # Aggregation (single row, multiple numeric cols)
     if len(rows) == 1 and ncols >= 1:
-        if all(isinstance(v, (int, float)) for v in rows[0]):
+        if all(_is_numeric_value(v) for v in rows[0]):
             return "bar"
 
     # Multiple rows with at least one numeric column
     if ncols >= 2 and len(rows) > 1:
-        has_num = any(isinstance(rows[0][i], (int, float)) for i in range(ncols))
+        has_num = any(_is_numeric_value(rows[0][i]) for i in range(ncols))
         if has_num:
             return "bar"
 
@@ -986,7 +999,7 @@ async def chat(req: ChatRequest):
             raise HTTPException(status_code=400, detail=err_str)
 
     suggested = _suggest_chart(result["columns"], result["rows"])
-    chart = nl_result.chart if nl_result.chart in {"bar", "pie", "line", "area", "table", "metric"} else suggested
+    chart = _final_chart_suggestion(nl_result.chart, suggested)
     insights = build_result_insights(
         message=req.message,
         sql=sql,
