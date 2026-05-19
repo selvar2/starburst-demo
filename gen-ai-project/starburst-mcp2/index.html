@@ -644,6 +644,11 @@ function appendBotMsg(data,msgId){
       <span>SQL Query</span><span style="font-size:1rem">&#9662;</span></div>
       <div class="sql-body"><pre>${highlightSQL(data.sql)}</pre></div></div>`;
   }
+  if(data.verification_sql){
+    html+=`<div class="sql-block"><div class="sql-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <span>Verification Query</span><span style="font-size:1rem">&#9662;</span></div>
+      <div class="sql-body"><pre>${highlightSQL(data.verification_sql)}</pre></div></div>`;
+  }
 
   if(data.requires_confirm){
     const op=esc(data.operation||'operation');

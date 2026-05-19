@@ -102,21 +102,20 @@ def _executive_summary(message: str, columns: list[str], rows: list[list], profi
             lead_text += "."
         return f"Returned {len(rows)} executive KPIs from approved enterprise data. {lead_text}"
     metric = _primary_metric(profile)
-    label = _primary_label(profile)
-    if metric and label:
-        total = metric["sum"]
-        top_idx = metric["values"].index(metric["max"])
-        top_label = rows[top_idx][label["idx"]]
-        return (
-            f"Returned {len(rows)} rows from approved enterprise data. "
-            f"Total {metric['name']} is {_format_value(metric['name'], total)}, "
-            f"with {top_label} leading at {_format_value(metric['name'], metric['max'])}."
-        )
+    labels = _focus_labels(profile)
+    if metric and labels:
+        top_pair, _ = _top_and_bottom_labels(metric, labels, rows)
+        if top_pair:
+            return (
+                f"Returned {len(rows)} rows from approved enterprise data. "
+                f"{metric['aggregate_label'].capitalize()} {metric['name']} is {metric['display_text']}, "
+                f"with {top_pair[0]} leading at {_format_value(metric['name'], top_pair[1])}."
+            )
     if metric:
         return (
             f"Returned {len(rows)} rows with {len(columns)} columns. "
-            f"Average {metric['name']} is {_format_value(metric['name'], metric['avg'])} "
-            f"and maximum is {_format_value(metric['name'], metric['max'])}."
+            f"{metric['aggregate_label'].capitalize()} {metric['name']} is {metric['display_text']} "
+            f"and maximum is {metric['max_text']}."
         )
     return f"Returned {len(rows)} rows with {len(columns)} columns from approved enterprise data sources."
 
@@ -134,25 +133,26 @@ def _business_insights(columns: list[str], rows: list[list], profile: dict) -> l
             else:
                 insights.append(f"{row[name_idx]} is {_format_value(str(row[name_idx]), float(row[actual_idx]))}.")
         return insights
-    metric = _primary_metric(profile)
-    label = _primary_label(profile)
     if not rows:
         return ["No data was returned for analysis."]
-    if metric and label:
-        pairs = []
-        for i, row in enumerate(rows):
-            if len(row) > label["idx"] and i < len(metric["values"]):
-                pairs.append((row[label["idx"]], metric["values"][i]))
-        pairs.sort(key=lambda item: item[1], reverse=True)
-        if pairs:
-            insights.append(f"Top performer is {pairs[0][0]} with {_format_value(metric['name'], pairs[0][1])}.")
-        if len(pairs) > 1:
-            insights.append(f"Lowest performer is {pairs[-1][0]} with {_format_value(metric['name'], pairs[-1][1])}.")
-        if metric["spread"] >= 2:
-            insights.append(f"{metric['name']} has strong variance at {metric['spread']:.1f}x from low to high, which should create a clear executive chart.")
-    for num in profile["numeric"][:3]:
-        if any(key in num["name"].lower() for key in ("growth", "margin", "retention", "churn", "rate")):
-            insights.append(f"Average {num['name']} is {_format_value(num['name'], num['avg'])}.")
+
+    metrics = [_metric_details(num) for num in profile["numeric"][:4]]
+    for metric in metrics:
+        insights.append(
+            f"{metric['label']} {metric['aggregate_verb']} {metric['display_text']} across the returned rows, "
+            f"with a row high of {metric['max_text']}."
+        )
+
+    focus_metric = _primary_metric(profile)
+    labels = _focus_labels(profile)
+    if focus_metric and labels:
+        top_pair, bottom_pair = _top_and_bottom_labels(focus_metric, labels, rows)
+        if top_pair and bottom_pair:
+            insights.append(
+                f"For {focus_metric['label']}, the returned rows range from {bottom_pair[0]} at "
+                f"{_format_value(focus_metric['name'], bottom_pair[1])} to {top_pair[0]} at "
+                f"{_format_value(focus_metric['name'], top_pair[1])}."
+            )
     return insights[:5] or ["Review the returned table for detailed records."]
 
 
@@ -176,11 +176,12 @@ def _kpi_cards(columns: list[str], rows: list[list], profile: dict) -> list[dict
         return cards
     cards = []
     for num in profile["numeric"][:5]:
+        metric = _metric_details(num)
         cards.append({
             "type": "metric",
-            "label": _title(num["name"]),
-            "value": _format_value(num["name"], num["sum"] if _is_additive(num["name"]) else num["avg"]),
-            "subtitle": f"max {_format_value(num['name'], num['max'])}",
+            "label": metric["label"],
+            "value": metric["display_text"],
+            "subtitle": f"max {metric['max_text']}",
         })
     return cards
 
@@ -194,20 +195,23 @@ def _trend_highlights(columns: list[str], rows: list[list], profile: dict) -> li
     if first:
         change = (last - first) / first
         direction = "growth" if change >= 0 else "decline"
-        return [f"{metric['name']} shows {direction} of {change * 100:.1f}% from first to last returned row."]
+        return [
+            f"{metric['label']} shows {direction} of {change * 100:.1f}% from the first returned row to the last."
+        ]
     return []
 
 
 def _recommendations(columns: list[str], rows: list[list], profile: dict) -> list[str]:
     metric = _primary_metric(profile)
-    label = _primary_label(profile)
-    if not metric or not label or not rows:
+    labels = _focus_labels(profile)
+    if not metric or not labels or not rows:
         return ["Use additional dimensions or filters to expand executive analysis."]
-    top_idx = metric["values"].index(metric["max"])
-    low_idx = metric["values"].index(metric["min"])
+    top_pair, low_pair = _top_and_bottom_labels(metric, labels, rows)
+    if not top_pair or not low_pair:
+        return ["Use additional dimensions or filters to expand executive analysis."]
     return [
-        f"Protect momentum in {rows[top_idx][label['idx']]} with executive focus on capacity and retention.",
-        f"Review underperformance drivers for {rows[low_idx][label['idx']]} and compare against top performer playbooks.",
+        f"Protect momentum in {top_pair[0]}, the strongest returned row for {metric['label']} at {_format_value(metric['name'], top_pair[1])}.",
+        f"Review underperformance drivers for {low_pair[0]}, where {metric['label']} is {_format_value(metric['name'], low_pair[1])}.",
     ]
 
 
@@ -220,11 +224,11 @@ def _chart_explanation(columns: list[str], rows: list[list], chart: str, profile
         return "The result is best reviewed as a table because no numeric measure was returned."
     if label:
         return (
-            f"The {chart or 'chart'} compares {metric['name']} by {label['name']}. "
-            f"The range from {_format_value(metric['name'], metric['min'])} to {_format_value(metric['name'], metric['max'])} "
+            f"The {chart or 'chart'} compares {metric['label']} by {label['name']}. "
+            f"The range from {metric['min_text']} to {metric['max_text']} "
             "provides enough spread for a clear executive visualization."
         )
-    return f"The {chart or 'chart'} summarizes {metric['name']} across the returned rows."
+    return f"The {chart or 'chart'} summarizes {metric['label']} across the returned rows."
 
 
 def _primary_metric(profile: dict) -> dict | None:
@@ -234,31 +238,91 @@ def _primary_metric(profile: dict) -> dict | None:
     for key in priority:
         for num in profile["numeric"]:
             if key in num["name"].lower():
-                return num
-    return profile["numeric"][0]
+                return _metric_details(num)
+    return _metric_details(profile["numeric"][0])
 
 
 def _primary_label(profile: dict) -> dict | None:
     return profile["text"][0] if profile["text"] else None
 
 
+def _focus_labels(profile: dict) -> list[dict]:
+    return profile["text"][:2]
+
+
+def _metric_details(num: dict) -> dict:
+    aggregate_label = "total" if _is_additive(num["name"]) else "average"
+    aggregate_verb = "totals" if aggregate_label == "total" else "averages"
+    display_value = num["sum"] if aggregate_label == "total" else num["avg"]
+    return {
+        **num,
+        "label": _title(num["name"]),
+        "aggregate_label": aggregate_label,
+        "aggregate_verb": aggregate_verb,
+        "display_value": display_value,
+        "display_text": _format_value(num["name"], display_value),
+        "min_text": _format_value(num["name"], num["min"]),
+        "max_text": _format_value(num["name"], num["max"]),
+    }
+
+
+def _top_and_bottom_labels(metric: dict, labels: list[dict], rows: list[list]) -> tuple[tuple[object, float] | None, tuple[object, float] | None]:
+    pairs = []
+    for i, row in enumerate(rows):
+        if i >= len(metric["values"]):
+            continue
+        row_label = _row_label(row, labels)
+        if row_label:
+            pairs.append((row_label, metric["values"][i]))
+    if not pairs:
+        return None, None
+    pairs.sort(key=lambda item: item[1], reverse=True)
+    return pairs[0], pairs[-1]
+
+
+def _row_label(row: list[object], labels: list[dict]) -> str:
+    parts = []
+    for label in labels:
+        if len(row) > label["idx"] and row[label["idx"]] not in (None, ""):
+            parts.append(str(row[label["idx"]]))
+    return " / ".join(parts)
+
+
 def _is_additive(name: str) -> bool:
     return any(key in name.lower() for key in ("revenue", "sales", "profit", "expense", "value", "units", "customers", "reviews", "stock"))
 
 
+def _value_kind(name: str) -> str:
+    normalized = name.lower().replace("-", " ").replace("_", " ")
+    tokens = [token for token in normalized.split() if token]
+    if any(token in ("elasticity", "rating") for token in tokens):
+        return "number"
+    if any(token in ("nps", "score") for token in tokens):
+        return "score"
+    if any(token in (
+        "rate", "margin", "churn", "retention", "growth", "share", "attainment",
+        "accuracy", "sentiment", "confidence", "adoption",
+    ) for token in tokens):
+        return "percent"
+    if any(token in (
+        "revenue", "sales", "profit", "expense", "value", "ltv", "price", "amount",
+        "arr", "bookings",
+    ) for token in tokens):
+        return "currency"
+    return "number"
+
+
 def _format_value(name: str, value: float) -> str:
-    lname = name.lower()
-    if any(key in lname for key in ("margin", "retention", "churn", "rate", "accuracy")):
-        return f"{value * 100:.1f}%" if abs(value) <= 5 else f"{value:.1f}%"
-    if any(key in lname for key in ("nps", "score")):
+    kind = _value_kind(name)
+    if kind == "score":
         return f"{value:.1f}"
-    if any(key in lname for key in ("revenue", "sales", "profit", "expense", "value", "ltv", "price", "amount")):
+    if kind == "currency":
         if abs(value) >= 1_000_000:
             return f"${value / 1_000_000:.1f}M"
         if abs(value) >= 1_000:
             return f"${value / 1_000:.1f}K"
         return f"${value:,.0f}"
-    if any(key in lname for key in ("rate", "margin", "churn", "retention", "growth", "share", "attainment", "accuracy")):
+    if kind == "percent":
         return f"{value * 100:.1f}%" if abs(value) <= 5 else f"{value:.1f}%"
     return f"{value:,.0f}" if abs(value) >= 100 else f"{value:.2f}"
 

@@ -115,6 +115,179 @@ def _exec(sql: str) -> dict:
     return {"columns": columns, "rows": rows, "row_count": len(rows)}
 
 
+def _verification_target_fqn(target: dict) -> str:
+    return f"{target['catalog']}.{target['schema']}.{target['table']}"
+
+
+def _split_sql_list(text: str) -> list[str]:
+    parts: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    in_quote = False
+    idx = 0
+    while idx < len(text):
+        ch = text[idx]
+        if ch == "'":
+            buf.append(ch)
+            if in_quote and idx + 1 < len(text) and text[idx + 1] == "'":
+                buf.append(text[idx + 1])
+                idx += 2
+                continue
+            in_quote = not in_quote
+            idx += 1
+            continue
+        if not in_quote:
+            if ch == "(":
+                depth += 1
+            elif ch == ")" and depth > 0:
+                depth -= 1
+            elif ch == "," and depth == 0:
+                part = "".join(buf).strip()
+                if part:
+                    parts.append(part)
+                buf = []
+                idx += 1
+                continue
+        buf.append(ch)
+        idx += 1
+    tail = "".join(buf).strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
+def _extract_parenthesized_groups(text: str) -> list[str]:
+    groups: list[str] = []
+    depth = 0
+    in_quote = False
+    start: int | None = None
+    idx = 0
+    while idx < len(text):
+        ch = text[idx]
+        if ch == "'":
+            if in_quote and idx + 1 < len(text) and text[idx + 1] == "'":
+                idx += 2
+                continue
+            in_quote = not in_quote
+            idx += 1
+            continue
+        if not in_quote:
+            if ch == "(":
+                if depth == 0:
+                    start = idx + 1
+                depth += 1
+            elif ch == ")" and depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    groups.append(text[start:idx].strip())
+                    start = None
+        idx += 1
+    return groups
+
+
+def _parse_identifier_list(text: str) -> list[str]:
+    return [part.strip().strip('"') for part in _split_sql_list(text)]
+
+
+def _parse_assignment_map(text: str) -> dict[str, str] | None:
+    assignments: dict[str, str] = {}
+    for part in _split_sql_list(text):
+        m = re.match(r'\s*"?(?P<col>[a-zA-Z_]\w*)"?\s*=\s*(?P<value>.+?)\s*$', part, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return None
+        assignments[m.group("col")] = m.group("value").strip()
+    return assignments or None
+
+
+def _parse_where_equalities(text: str) -> dict[str, str] | None:
+    predicates: dict[str, str] = {}
+    for part in re.split(r'\bAND\b', text, flags=re.IGNORECASE):
+        clause = part.strip().strip("() ")
+        m = re.match(r'\s*"?(?P<col>[a-zA-Z_]\w*)"?\s*=\s*(?P<value>.+?)\s*$', clause, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return None
+        predicates[m.group("col")] = m.group("value").strip()
+    return predicates or None
+
+
+def _describe_table_columns(target: dict) -> list[str]:
+    fqn = _verification_target_fqn(target)
+    result = client.execute(f"DESCRIBE {fqn}")
+    columns: list[str] = []
+    for row in result.get("rows", []):
+        if row and row[0]:
+            name = str(row[0]).strip().strip('"')
+            if name and not name.startswith("#"):
+                columns.append(name)
+    return columns
+
+
+def _build_insert_verification_sql(sql: str, target: dict) -> tuple[str | None, str | None]:
+    match = re.search(r'\bINSERT\s+INTO\s+[\w."]+\s*(?:\((?P<columns>.*?)\))?\s*VALUES\s*(?P<values>.+?)\s*;?\s*$', sql, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return None, "Could not parse INSERT statement for verification."
+    columns = _parse_identifier_list(match.group("columns")) if match.group("columns") else _describe_table_columns(target)
+    row_groups = _extract_parenthesized_groups(match.group("values"))
+    if not columns:
+        return None, "Unable to infer inserted columns for verification."
+    if not row_groups:
+        return None, "Could not parse inserted VALUES for verification."
+    predicates: list[str] = []
+    for group in row_groups:
+        values = _split_sql_list(group)
+        if len(values) != len(columns):
+            return None, "Inserted values do not match the target columns."
+        predicates.append("(" + " AND ".join(f"{col} = {value.strip()}" for col, value in zip(columns, values)) + ")")
+    return f"SELECT * FROM {_verification_target_fqn(target)} WHERE " + " OR ".join(predicates) + " LIMIT 100", None
+
+
+def _build_update_verification_sql(sql: str, target: dict) -> tuple[str | None, str | None]:
+    match = re.search(r'\bUPDATE\s+[\w."]+\s+SET\s+(?P<set>.+?)\s+WHERE\s+(?P<where>.+?)\s*;?\s*$', sql, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return None, "Could not parse UPDATE statement for verification."
+    set_values = _parse_assignment_map(match.group("set"))
+    where_values = _parse_where_equalities(match.group("where"))
+    if not set_values:
+        return None, "Could not parse updated columns for verification."
+    if not where_values:
+        return None, "Could not safely parse the UPDATE WHERE clause for verification."
+    verification_values = dict(where_values)
+    verification_values.update(set_values)
+    predicate_sql = " AND ".join(f"{column} = {value}" for column, value in verification_values.items())
+    return f"SELECT * FROM {_verification_target_fqn(target)} WHERE {predicate_sql} LIMIT 100", None
+
+
+def _build_write_verification_sql(sql: str, op_label: str, target: dict) -> tuple[str | None, str | None]:
+    if op_label == "INSERT":
+        return _build_insert_verification_sql(sql, target)
+    if op_label == "UPDATE":
+        return _build_update_verification_sql(sql, target)
+    return None, "Verification queries are only supported for INSERT and UPDATE."
+
+
+def _attach_write_verification(result: dict, sql: str, op_label: str, target: dict) -> dict:
+    if "rows_affected" not in result or op_label not in {"INSERT", "UPDATE"}:
+        return result
+    enriched = dict(result)
+    verification_sql, verification_reason = _build_write_verification_sql(sql, op_label, target)
+    if not verification_sql:
+        enriched["verification_reason"] = verification_reason
+        return enriched
+    enriched["verification_sql"] = verification_sql
+    try:
+        verification_result = _exec(verification_sql)
+    except QueryError as exc:
+        enriched["verification_reason"] = str(exc)
+        return enriched
+    enriched["verification_columns"] = verification_result["columns"]
+    enriched["verification_rows"] = verification_result["rows"]
+    enriched["verification_row_count"] = verification_result["row_count"]
+    enriched["columns"] = verification_result["columns"]
+    enriched["rows"] = verification_result["rows"]
+    enriched["row_count"] = verification_result["row_count"]
+    return enriched
+
+
 # ---------------------------------------------------------------------------
 # DDL/DML classification, FQ validation, permission, destructive guard
 # ---------------------------------------------------------------------------
@@ -986,6 +1159,7 @@ async def chat(req: ChatRequest):
 
     try:
         result = _exec(sql)
+        result = _attach_write_verification(result, sql, op_label, target)
     except QueryError as exc:
         err_str = str(exc)
         if perm_key == "read" and ("TABLE_NOT_FOUND" in err_str or "does not exist" in err_str):
@@ -1037,7 +1211,15 @@ async def chat(req: ChatRequest):
     if "rows_affected" in result:
         payload["rows_affected"] = result["rows_affected"]
         payload["status"] = result.get("status", "ok")
-        payload["message"] = f"{op_label} completed on {target.get('catalog')}.{target.get('schema')}" + (f".{target['table']}" if target.get('table') else "") + f" — rows_affected={result['rows_affected']}"
+        target_name = f"{target.get('catalog')}.{target.get('schema')}" + (f".{target['table']}" if target.get('table') else "")
+        payload["message"] = f"{op_label} completed on {target_name} — rows_affected={result['rows_affected']}"
+        if result.get("verification_sql"):
+            payload["verification_sql"] = result["verification_sql"]
+            payload["verification_row_count"] = result.get("verification_row_count", result["row_count"])
+            payload["message"] += f". Verification query returned {payload['row_count']} row(s)."
+        if result.get("verification_reason"):
+            payload["verification_reason"] = result["verification_reason"]
+            payload["message"] += f". Verification query unavailable: {result['verification_reason']}"
     return payload
 
 
