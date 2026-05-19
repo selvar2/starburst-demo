@@ -139,8 +139,8 @@ def _business_insights(columns: list[str], rows: list[list], profile: dict) -> l
     metrics = [_metric_details(num) for num in profile["numeric"][:4]]
     for metric in metrics:
         insights.append(
-            f"{metric['label']} {metric['aggregate_verb']} {metric['display_text']} across the returned rows, "
-            f"with a row high of {metric['max_text']}."
+            f"{metric['label']} {metric['summary_verb']} {metric['display_text']}, "
+            f"reaching a high of {metric['max_text']}."
         )
 
     focus_metric = _primary_metric(profile)
@@ -149,7 +149,7 @@ def _business_insights(columns: list[str], rows: list[list], profile: dict) -> l
         top_pair, bottom_pair = _top_and_bottom_labels(focus_metric, labels, rows)
         if top_pair and bottom_pair:
             insights.append(
-                f"For {focus_metric['label']}, the returned rows range from {bottom_pair[0]} at "
+                f"For {focus_metric['label']}, results range from {bottom_pair[0]} at "
                 f"{_format_value(focus_metric['name'], bottom_pair[1])} to {top_pair[0]} at "
                 f"{_format_value(focus_metric['name'], top_pair[1])}."
             )
@@ -194,9 +194,9 @@ def _trend_highlights(columns: list[str], rows: list[list], profile: dict) -> li
     last = metric["values"][-1]
     if first:
         change = (last - first) / first
-        direction = "growth" if change >= 0 else "decline"
+        direction = "increased" if change >= 0 else "decreased"
         return [
-            f"{metric['label']} shows {direction} of {change * 100:.1f}% from the first returned row to the last."
+            f"{metric['label']} {direction} by {abs(change) * 100:.1f}% across the selected range."
         ]
     return []
 
@@ -228,7 +228,7 @@ def _chart_explanation(columns: list[str], rows: list[list], chart: str, profile
             f"The range from {metric['min_text']} to {metric['max_text']} "
             "provides enough spread for a clear executive visualization."
         )
-    return f"The {chart or 'chart'} summarizes {metric['label']} across the returned rows."
+    return f"The {chart or 'chart'} summarizes {metric['label']} across the selected results."
 
 
 def _primary_metric(profile: dict) -> dict | None:
@@ -253,12 +253,14 @@ def _focus_labels(profile: dict) -> list[dict]:
 def _metric_details(num: dict) -> dict:
     aggregate_label = "total" if _is_additive(num["name"]) else "average"
     aggregate_verb = "totals" if aggregate_label == "total" else "averages"
+    summary_verb = "totaled" if aggregate_label == "total" else "averaged"
     display_value = num["sum"] if aggregate_label == "total" else num["avg"]
     return {
         **num,
         "label": _title(num["name"]),
         "aggregate_label": aggregate_label,
         "aggregate_verb": aggregate_verb,
+        "summary_verb": summary_verb,
         "display_value": display_value,
         "display_text": _format_value(num["name"], display_value),
         "min_text": _format_value(num["name"], num["min"]),

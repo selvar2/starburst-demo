@@ -49,10 +49,20 @@ def test_demo_tables_render_presentation_ready_metrics_and_bullets():
         assert result.kpis, spec.name
         assert result.insights, spec.name
 
+        for insight in result.insights:
+            lowered = insight.lower()
+            assert "returned rows" not in lowered, (spec.name, insight)
+            assert "row high" not in lowered, (spec.name, insight)
+            assert "first returned row" not in lowered, (spec.name, insight)
+
         kpis_by_label = {card["label"]: card["value"] for card in result.kpis}
         for (table_name, label), expected in expected_values.items():
             if table_name == spec.name:
                 assert kpis_by_label[label] == expected
+
+        if spec.name == "customer_engagement":
+            assert "Engagement Score averaged 82.2, reaching a high of 96.0." in result.insights
+            assert "Engagement Score increased by 13.0% across the selected range." in result.trend_highlights
 
         bad_values = {"0.64", "1.31", "0.03", "0.91", "0.83"}
         for card in result.kpis[:6]:
