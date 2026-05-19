@@ -257,16 +257,45 @@ def _build_update_verification_sql(sql: str, target: dict) -> tuple[str | None, 
     return f"SELECT * FROM {_verification_target_fqn(target)} WHERE {predicate_sql} LIMIT 100", None
 
 
+def _sql_string_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _build_create_table_verification_sql(target: dict) -> tuple[str | None, str | None]:
+    if not target.get("table"):
+        return None, "CREATE TABLE verification requires a fully qualified table target."
+    return (
+        f"SELECT table_catalog, table_schema, table_name FROM {target['catalog']}.information_schema.tables "
+        f"WHERE table_schema = {_sql_string_literal(target['schema'])} "
+        f"AND table_name = {_sql_string_literal(target['table'])} LIMIT 100",
+        None,
+    )
+
+
+def _build_create_schema_verification_sql(target: dict) -> tuple[str | None, str | None]:
+    return (
+        f"SELECT catalog_name, schema_name FROM {target['catalog']}.information_schema.schemata "
+        f"WHERE schema_name = {_sql_string_literal(target['schema'])} LIMIT 100",
+        None,
+    )
+
+
 def _build_write_verification_sql(sql: str, op_label: str, target: dict) -> tuple[str | None, str | None]:
     if op_label == "INSERT":
         return _build_insert_verification_sql(sql, target)
     if op_label == "UPDATE":
         return _build_update_verification_sql(sql, target)
-    return None, "Verification queries are only supported for INSERT and UPDATE."
+    if op_label == "CREATE TABLE":
+        return _build_create_table_verification_sql(target)
+    if op_label == "CREATE SCHEMA":
+        return _build_create_schema_verification_sql(target)
+    return None, "Verification queries are only supported for INSERT, UPDATE, CREATE TABLE, and CREATE SCHEMA."
 
 
 def _attach_write_verification(result: dict, sql: str, op_label: str, target: dict) -> dict:
-    if "rows_affected" not in result or op_label not in {"INSERT", "UPDATE"}:
+    if op_label not in {"INSERT", "UPDATE", "CREATE TABLE", "CREATE SCHEMA"}:
+        return result
+    if op_label in {"INSERT", "UPDATE"} and "rows_affected" not in result:
         return result
     enriched = dict(result)
     verification_sql, verification_reason = _build_write_verification_sql(sql, op_label, target)
@@ -1208,18 +1237,23 @@ async def chat(req: ChatRequest):
         "followups": nl_result.followups,
         "warnings": nl_result.warnings,
     }
+    target_name = f"{target.get('catalog')}.{target.get('schema')}" + (f".{target['table']}" if target.get('table') else "")
+    if result.get("verification_sql"):
+        payload["verification_sql"] = result["verification_sql"]
+        payload["verification_row_count"] = result.get("verification_row_count", result["row_count"])
+    if result.get("verification_reason"):
+        payload["verification_reason"] = result["verification_reason"]
     if "rows_affected" in result:
         payload["rows_affected"] = result["rows_affected"]
         payload["status"] = result.get("status", "ok")
-        target_name = f"{target.get('catalog')}.{target.get('schema')}" + (f".{target['table']}" if target.get('table') else "")
         payload["message"] = f"{op_label} completed on {target_name} — rows_affected={result['rows_affected']}"
-        if result.get("verification_sql"):
-            payload["verification_sql"] = result["verification_sql"]
-            payload["verification_row_count"] = result.get("verification_row_count", result["row_count"])
-            payload["message"] += f". Verification query returned {payload['row_count']} row(s)."
-        if result.get("verification_reason"):
-            payload["verification_reason"] = result["verification_reason"]
-            payload["message"] += f". Verification query unavailable: {result['verification_reason']}"
+    elif op_label in {"CREATE TABLE", "CREATE SCHEMA"}:
+        payload["status"] = result.get("status", "ok")
+        payload["message"] = f"{op_label} completed on {target_name}"
+    if result.get("verification_sql"):
+        payload["message"] += f". Verification query returned {payload['row_count']} row(s)."
+    if result.get("verification_reason"):
+        payload["message"] += f". Verification query unavailable: {result['verification_reason']}"
     return payload
 
 

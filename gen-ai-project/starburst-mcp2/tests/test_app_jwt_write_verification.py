@@ -113,3 +113,134 @@ def test_chat_insert_returns_verified_rows(monkeypatch):
     assert payload["columns"] == ["id", "name", "amount"]
     assert payload["rows"] == [[1, "alice", 10.0]]
     assert payload["row_count"] == 1
+
+
+
+def test_build_create_table_verification_sql():
+    target = {"catalog": "mcp2ohio", "schema": "test_writes", "table": "demo"}
+
+    verification_sql, reason = app_jwt._build_write_verification_sql(
+        "CREATE TABLE mcp2ohio.test_writes.demo (id INTEGER)",
+        "CREATE TABLE",
+        target,
+    )
+
+    assert reason is None
+    assert verification_sql == (
+        "SELECT table_catalog, table_schema, table_name FROM mcp2ohio.information_schema.tables "
+        "WHERE table_schema = 'test_writes' AND table_name = 'demo' LIMIT 100"
+    )
+
+
+def test_chat_create_table_returns_verified_metadata_rows(monkeypatch):
+    executed = []
+    create_sql = "CREATE TABLE mcp2ohio.test_writes.demo (id INTEGER)"
+    verify_sql = (
+        "SELECT table_catalog, table_schema, table_name FROM mcp2ohio.information_schema.tables "
+        "WHERE table_schema = 'test_writes' AND table_name = 'demo' LIMIT 100"
+    )
+
+    class FakeClient:
+        catalog = "mcp2ohio"
+        schema = "test_writes"
+        host = "example"
+        auth_mode = "jwt"
+
+        def execute(self, sql: str):
+            executed.append(sql)
+            if sql == create_sql:
+                return {"status": "ok"}
+            if sql == verify_sql:
+                return {"columns": ["table_catalog", "table_schema", "table_name"], "rows": [["mcp2ohio", "test_writes", "demo"]]}
+            raise AssertionError(sql)
+
+    class StubNL2SQLService:
+        def translate(self, message, catalog, schema, schema_cache):
+            return SimpleNamespace(
+                sql=message,
+                source="sql",
+                query_type="direct_sql",
+                chart="table",
+                matched_terms=[],
+                grounding_reason=None,
+                confidence=1.0,
+                assumptions=[],
+                followups=[],
+                warnings=[],
+                error=None,
+            )
+
+    monkeypatch.setattr(app_jwt, "client", FakeClient())
+    monkeypatch.setattr(app_jwt, "_nl2sql_service", StubNL2SQLService())
+    monkeypatch.setattr(app_jwt, "_check_permission", lambda perm_key: None)
+    monkeypatch.setattr(app_jwt, "_enforce_destructive_confirm", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app_jwt, "_suggest_chart", lambda columns, rows: "table")
+    monkeypatch.setattr(app_jwt, "_final_chart_suggestion", lambda requested, suggested: suggested)
+
+    payload = asyncio.run(app_jwt.chat(app_jwt.ChatRequest(
+        message=create_sql,
+        context={"catalog": "mcp2ohio", "schema": "test_writes"},
+    )))
+
+    assert executed == [create_sql, verify_sql]
+    assert payload["verification_sql"] == verify_sql
+    assert payload["columns"] == ["table_catalog", "table_schema", "table_name"]
+    assert payload["rows"] == [["mcp2ohio", "test_writes", "demo"]]
+    assert payload["message"] == "CREATE TABLE completed on mcp2ohio.test_writes.demo. Verification query returned 1 row(s)."
+
+
+def test_chat_create_schema_returns_verified_metadata_rows(monkeypatch):
+    executed = []
+    create_sql = "CREATE SCHEMA mcp2ohio.demo_schema"
+    verify_sql = (
+        "SELECT catalog_name, schema_name FROM mcp2ohio.information_schema.schemata "
+        "WHERE schema_name = 'demo_schema' LIMIT 100"
+    )
+
+    class FakeClient:
+        catalog = "mcp2ohio"
+        schema = "test_writes"
+        host = "example"
+        auth_mode = "jwt"
+
+        def execute(self, sql: str):
+            executed.append(sql)
+            if sql == create_sql:
+                return {"status": "ok"}
+            if sql == verify_sql:
+                return {"columns": ["catalog_name", "schema_name"], "rows": [["mcp2ohio", "demo_schema"]]}
+            raise AssertionError(sql)
+
+    class StubNL2SQLService:
+        def translate(self, message, catalog, schema, schema_cache):
+            return SimpleNamespace(
+                sql=message,
+                source="sql",
+                query_type="direct_sql",
+                chart="table",
+                matched_terms=[],
+                grounding_reason=None,
+                confidence=1.0,
+                assumptions=[],
+                followups=[],
+                warnings=[],
+                error=None,
+            )
+
+    monkeypatch.setattr(app_jwt, "client", FakeClient())
+    monkeypatch.setattr(app_jwt, "_nl2sql_service", StubNL2SQLService())
+    monkeypatch.setattr(app_jwt, "_check_permission", lambda perm_key: None)
+    monkeypatch.setattr(app_jwt, "_enforce_destructive_confirm", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app_jwt, "_suggest_chart", lambda columns, rows: "table")
+    monkeypatch.setattr(app_jwt, "_final_chart_suggestion", lambda requested, suggested: suggested)
+
+    payload = asyncio.run(app_jwt.chat(app_jwt.ChatRequest(
+        message=create_sql,
+        context={"catalog": "mcp2ohio", "schema": "test_writes"},
+    )))
+
+    assert executed == [create_sql, verify_sql]
+    assert payload["verification_sql"] == verify_sql
+    assert payload["columns"] == ["catalog_name", "schema_name"]
+    assert payload["rows"] == [["mcp2ohio", "demo_schema"]]
+    assert payload["message"] == "CREATE SCHEMA completed on mcp2ohio.demo_schema. Verification query returned 1 row(s)."
