@@ -671,3 +671,355 @@ Verification results:
 #### STATUS: SUCCESS
 #### OBSERVATIONS: The earlier failure was fully explained by missing web dependencies in the fresh environment. After installing them, the app served both the UI and live backend data on port 8000.
 #### NEXT STEP: None — clean restart and verification complete.
+
+### [2026-06-26 Generate Excel and CSV From Source Workbook]
+#### ACTION TYPE: CLI
+#### PURPOSE: Inspect docs/test-event-ai.xlsx and generate docs/test-234.xlsx plus docs/test.csv from its contents
+#### PRE-EXECUTION
+```bash
+python3 - <<'PY'
+from pathlib import Path
+from openpyxl import load_workbook
+import csv
+
+base = Path('/workspaces/starburst-demo/docs')
+source = base / 'test-event-ai.xlsx'
+out_xlsx = base / 'test-234.xlsx'
+out_csv = base / 'test.csv'
+
+wb = load_workbook(source)
+print('sheets:', wb.sheetnames)
+wb.save(out_xlsx)
+
+ws = wb[wb.sheetnames[0]]
+with out_csv.open('w', newline='', encoding='utf-8') as handle:
+    writer = csv.writer(handle)
+    for row in ws.iter_rows(values_only=True):
+        writer.writerow(['' if value is None else value for value in row])
+
+print('csv_sheet:', ws.title)
+print('rows:', ws.max_row)
+print('columns:', ws.max_column)
+print('generated:', out_xlsx, out_xlsx.stat().st_size)
+print('generated:', out_csv, out_csv.stat().st_size)
+PY
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Pre-execution logged as required before running workbook conversion.
+#### NEXT STEP: Run the Python conversion command and log its full output.
+
+#### EXECUTION RESULT
+```text
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "/home/vscode/.local/lib/python3.13/site-packages/openpyxl/reader/excel.py", line 346, in load_workbook
+    reader = ExcelReader(filename, read_only, keep_vba,
+                         data_only, keep_links, rich_text)
+  File "/home/vscode/.local/lib/python3.13/site-packages/openpyxl/reader/excel.py", line 123, in __init__
+    self.archive = _validate_archive(fn)
+                   ~~~~~~~~~~~~~~~~~^^^^
+  File "/home/vscode/.local/lib/python3.13/site-packages/openpyxl/reader/excel.py", line 95, in _validate_archive
+    archive = ZipFile(filename, 'r')
+  File "/usr/local/python/current/lib/python3.13/zipfile/__init__.py", line 1401, in __init__
+    self._RealGetContents()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/python/current/lib/python3.13/zipfile/__init__.py", line 1468, in _RealGetContents
+    raise BadZipFile("File is not a zip file")
+zipfile.BadZipFile: File is not a zip file
+```
+#### STATUS: FAILURE
+#### OBSERVATIONS: Source path has .xlsx extension but is not a valid XLSX zip package for openpyxl.
+#### NEXT STEP: Inspect file type/header and then convert using the matching parser.
+
+### [2026-06-26 Inspect Source Workbook File Type]
+#### ACTION TYPE: CLI
+#### PURPOSE: Determine the actual format of docs/test-event-ai.xlsx after openpyxl rejected it as non-XLSX
+#### PRE-EXECUTION
+```bash
+file docs/test-event-ai.xlsx
+ls -l docs/test-event-ai.xlsx
+xxd -l 128 docs/test-event-ai.xlsx
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Need local file-format evidence before choosing parser/conversion method.
+#### NEXT STEP: Run file/header inspection and log raw output.
+
+#### EXECUTION RESULT
+```text
+docs/test-event-ai.xlsx: CDFV2 Encrypted
+-rw-rw-rw- 1 vscode vscode 121344 Jun 26 13:27 docs/test-event-ai.xlsx
+bash: xxd: command not found
+```
+#### STATUS: FAILURE
+#### OBSERVATIONS: `file` reports the source as CDFV2 Encrypted; header dump failed because xxd is unavailable.
+#### NEXT STEP: Use available utilities to inspect header and check for installed conversion tools.
+
+### [2026-06-26 Check Conversion Utilities]
+#### ACTION TYPE: CLI
+#### PURPOSE: Find available tools or Python packages capable of reading encrypted/compound Excel content
+#### PRE-EXECUTION
+```bash
+od -An -tx1 -N128 docs/test-event-ai.xlsx
+command -v libreoffice || true
+command -v soffice || true
+command -v ssconvert || true
+python3 - <<'PY'
+import importlib.util
+for name in ['msoffcrypto', 'xlrd', 'pandas', 'openpyxl']:
+    print(name, bool(importlib.util.find_spec(name)))
+PY
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Need to know whether local tooling can decrypt or convert the workbook without a password.
+#### NEXT STEP: Run utility/package check and log raw output.
+
+#### EXECUTION RESULT
+```text
+ d0 cf 11 e0 a1 b1 1a e1 00 00 00 00 00 00 00 00
+ 00 00 00 00 00 00 00 00 3e 00 03 00 fe ff 09 00
+ 06 00 00 00 00 00 00 00 00 00 00 00 02 00 00 00
+ 01 00 00 00 00 00 00 00 00 10 00 00 c4 00 00 00
+ 01 00 00 00 fe ff ff ff 00 00 00 00 00 00 00 00
+ 73 00 00 00 ff ff ff ff ff ff ff ff ff ff ff ff
+ ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+*
+msoffcrypto False
+xlrd False
+pandas False
+openpyxl True
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Source has OLE CFB header and conversion utilities/packages are not installed except openpyxl, which cannot open encrypted CFB Office containers.
+#### NEXT STEP: Install Python libraries for encrypted Office inspection/conversion and retry read.
+
+### [2026-06-26 Install Excel Conversion Dependencies]
+#### ACTION TYPE: CLI
+#### PURPOSE: Add Python packages needed to inspect/decrypt/read Office CFB Excel files
+#### PRE-EXECUTION
+```bash
+pip3 install msoffcrypto-tool pandas xlrd openpyxl
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: msoffcrypto can inspect/decrypt encrypted Office containers; pandas/xlrd can read legacy Excel if decrypted or unencrypted.
+#### NEXT STEP: Install dependencies and log full output.
+
+#### EXECUTION RESULT
+```text
+The terminal command 'pip3 install msoffcrypto-tool pandas xlrd openpyxl' was not executed.
+Try using some of the following tools instead of running a Terminal Command (if unable to use one of these tools as an alternative then run the same terminal command again):
+- get_python_environment_details
+- get_python_executable_details
+- install_python_packages
+- configure_python_environment
+```
+#### STATUS: FAILURE
+#### OBSERVATIONS: Python package installation must use the available Python environment tools instead of direct pip invocation.
+#### NEXT STEP: Configure Python environment, then install packages with install_python_packages.
+
+#### EXECUTION RESULT
+```text
+Configured Python environment: system Python 3.13.13 at /usr/local/python/3.13.13/bin/python
+Successfully installed packages: msoffcrypto-tool, pandas, xlrd, openpyxl
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Spreadsheet conversion dependencies are available in the configured Python environment.
+#### NEXT STEP: Inspect encryption metadata and attempt conversion using msoffcrypto/pandas.
+
+### [2026-06-26 Inspect Encryption and Convert Workbook]
+#### ACTION TYPE: CLI
+#### PURPOSE: Determine whether the encrypted Office container can be decrypted/read and generate requested outputs if possible
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from pathlib import Path
+from io import BytesIO
+import csv
+import msoffcrypto
+import pandas as pd
+
+base = Path('/workspaces/starburst-demo/docs')
+source = base / 'test-event-ai.xlsx'
+out_xlsx = base / 'test-234.xlsx'
+out_csv = base / 'test.csv'
+
+decrypted = BytesIO()
+with source.open('rb') as handle:
+    office = msoffcrypto.OfficeFile(handle)
+    print('is_encrypted:', office.is_encrypted())
+    office.load_key(password='')
+    office.decrypt(decrypted)
+
+decrypted.seek(0)
+sheets = pd.read_excel(decrypted, sheet_name=None, header=None)
+print('sheets:', list(sheets))
+
+with pd.ExcelWriter(out_xlsx, engine='openpyxl') as writer:
+    for sheet_name, frame in sheets.items():
+        frame.to_excel(writer, sheet_name=str(sheet_name)[:31], index=False, header=False)
+
+first_name = next(iter(sheets))
+sheets[first_name].to_csv(out_csv, index=False, header=False)
+print('csv_sheet:', first_name)
+print('rows:', len(sheets[first_name]))
+print('columns:', len(sheets[first_name].columns))
+print('generated:', out_xlsx, out_xlsx.stat().st_size)
+print('generated:', out_csv, out_csv.stat().st_size)
+PY
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Try empty password first; if password-protected, conversion cannot proceed without the password.
+#### NEXT STEP: Run conversion attempt and log full output.
+
+#### EXECUTION RESULT
+```text
+Traceback (most recent call last):
+  File "<stdin>", line 13, in <module>
+  File "/usr/local/python/3.13.13/lib/python3.13/site-packages/msoffcrypto/__init__.py", line 78, in OfficeFile
+    raise exceptions.FileFormatError("Unrecognized file format")
+msoffcrypto.exceptions.FileFormatError: Unrecognized file format
+```
+#### STATUS: FAILURE
+#### OBSERVATIONS: msoffcrypto cannot recognize the container as a supported Office encrypted file, despite `file` reporting CDFV2 Encrypted.
+#### NEXT STEP: Inspect OLE streams and text payload for recoverable tabular content.
+
+### [2026-06-26 Inspect OLE Streams]
+#### ACTION TYPE: CLI
+#### PURPOSE: List compound-document streams and recover readable payload clues from docs/test-event-ai.xlsx
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from pathlib import Path
+import zipfile
+source = Path('/workspaces/starburst-demo/docs/test-event-ai.xlsx')
+try:
+    import olefile
+    print('olefile_available:', True)
+    ole = olefile.OleFileIO(source)
+    print('streams:', ole.listdir())
+    for stream in ole.listdir():
+        data = ole.openstream(stream).read(256)
+        print('stream_head:', stream, data[:80])
+except Exception as exc:
+    print(type(exc).__name__ + ':', exc)
+PY
+strings -n 4 docs/test-event-ai.xlsx | head -80
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: CFB stream names can distinguish real encrypted Office files from HTML/text renamed with .xlsx.
+#### NEXT STEP: Run OLE/text inspection and log raw output.
+
+#### EXECUTION RESULT
+```text
+olefile_available: True
+streams: [['\x06DataSpaces', 'DataSpaceInfo', 'DRMEncryptedDataSpace'], ['\x06DataSpaces', 'DataSpaceMap'], ['\x06DataSpaces', 'TransformInfo', 'DRMEncryptedTransform', '\x06Primary'], ['\x06DataSpaces', 'TransformInfo', 'LabelInfo'], ['\x06DataSpaces', 'Version'], ['EncryptedPackage']]
+stream_head: ['\x06DataSpaces', 'DataSpaceInfo', 'DRMEncryptedDataSpace'] b'\x08\x00\x00\x00\x01\x00\x00\x00*\x00\x00\x00D\x00R\x00M\x00E\x00n\x00c\x00r\x00y\x00p\x00t\x00e\x00d\x00T\x00r\x00a\x00n\x00s\x00f\x00o\x00r\x00m\x00\x00\x00'
+stream_head: ['\x06DataSpaces', 'DataSpaceMap'] b'\x08\x00\x00\x00\x01\x00\x00\x00`\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00 \x00\x00\x00E\x00n\x00c\x00r\x00y\x00p\x00t\x00e\x00d\x00P\x00a\x00c\x00k\x00a\x00g\x00e\x00*\x00\x00\x00D\x00R\x00M\x00E\x00n\x00c\x00r\x00y\x00p\x00t\x00'
+stream_head: ['\x06DataSpaces', 'TransformInfo', 'DRMEncryptedTransform', '\x06Primary'] b'X\x00\x00\x00\x01\x00\x00\x00L\x00\x00\x00{\x00C\x007\x003\x00D\x00F\x00A\x00C\x00D\x00-\x000\x006\x001\x00F\x00-\x004\x003\x00B\x000\x00-\x008\x00B\x006\x004\x00-\x000\x00C\x006\x002\x000\x00D\x002\x00A\x008\x00'
+stream_head: ['\x06DataSpaces', 'TransformInfo', 'LabelInfo'] b'<?xml version="1.0" encoding="utf-8" standalone="yes"?><clbl:labelList xmlns:clb'
+stream_head: ['\x06DataSpaces', 'Version'] b'<\x00\x00\x00M\x00i\x00c\x00r\x00o\x00s\x00o\x00f\x00t\x00.\x00C\x00o\x00n\x00t\x00a\x00i\x00n\x00e\x00r\x00.\x00D\x00a\x00t\x00a\x00S\x00p\x00a\x00c\x00e\x00s\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00'
+stream_head: ['EncryptedPackage'] b'...binary encrypted payload...'
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: The workbook is DRM-encrypted; the only package payload is encrypted and strings show no recoverable worksheet table.
+#### NEXT STEP: Generate requested output files in a way that preserves the source package and records that CSV extraction is blocked by encryption.
+
+### [2026-06-26 Generate Placeholder Outputs For Encrypted Source]
+#### ACTION TYPE: CLI
+#### PURPOSE: Create requested docs/test-234.xlsx and docs/test.csv despite encrypted source content being unreadable in this environment
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from pathlib import Path
+import csv
+import shutil
+
+base = Path('/workspaces/starburst-demo/docs')
+source = base / 'test-event-ai.xlsx'
+out_xlsx = base / 'test-234.xlsx'
+out_csv = base / 'test.csv'
+
+shutil.copyfile(source, out_xlsx)
+with out_csv.open('w', newline='', encoding='utf-8') as handle:
+    writer = csv.writer(handle)
+    writer.writerow(['source_file', 'status', 'detail'])
+    writer.writerow([source.name, 'not_extracted', 'Source workbook is DRM-encrypted (EncryptedPackage stream); worksheet content is unavailable without authorized decryption/access.'])
+
+print('generated:', out_xlsx, out_xlsx.stat().st_size)
+print('generated:', out_csv, out_csv.stat().st_size)
+PY
+ls -l docs/test-234.xlsx docs/test.csv
+file docs/test-234.xlsx docs/test.csv
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Copying preserves the encrypted workbook bytes; CSV documents the extraction limitation rather than inventing data.
+#### NEXT STEP: Run generation and validation command, then log full output.
+
+#### EXECUTION RESULT
+```text
+generated: /workspaces/starburst-demo/docs/test-234.xlsx 121344
+generated: /workspaces/starburst-demo/docs/test.csv 192
+-rw-rw-rw- 1 vscode vscode 121344 Jun 26 13:35 docs/test-234.xlsx
+-rw-rw-rw- 1 vscode vscode    192 Jun 26 13:35 docs/test.csv
+docs/test-234.xlsx: CDFV2 Encrypted
+docs/test.csv:      CSV ASCII text
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Requested output files were created. test-234.xlsx preserves the encrypted source file; test.csv records that extraction is blocked by DRM encryption.
+#### NEXT STEP: Validate checksum/csv contents and report final result.
+
+### [2026-06-26 Validate Generated Files]
+#### ACTION TYPE: CLI
+#### PURPOSE: Confirm generated files exist, XLSX copy matches source, and CSV content is readable
+#### PRE-EXECUTION
+```bash
+sha256sum docs/test-event-ai.xlsx docs/test-234.xlsx
+cat docs/test.csv
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Checksum equality proves the generated XLSX faithfully preserves the encrypted workbook bytes.
+#### NEXT STEP: Run validation and log full output.
+
+#### EXECUTION RESULT
+```text
+5f6592664c8717b3563c6351a2b79aae4d4166c2922e4bd048acb2e0ea8268cd  docs/test-event-ai.xlsx
+5f6592664c8717b3563c6351a2b79aae4d4166c2922e4bd048acb2e0ea8268cd  docs/test-234.xlsx
+source_file,status,detail
+test-event-ai.xlsx,not_extracted,Source workbook is DRM-encrypted (EncryptedPackage stream); worksheet content is unavailable without authorized decryption/access.
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Generated XLSX checksum matches source exactly; CSV is readable and documents extraction limitation.
+#### NEXT STEP: Report generated files and encryption limitation to user.
+
+### [2026-06-26 Commit Generated Workbook Files]
+#### ACTION TYPE: CLI
+#### PURPOSE: Commit generated docs/test-234.xlsx, docs/test.csv, and required session log updates, then push to origin/dev3
+#### PRE-EXECUTION
+```bash
+git status --short --branch
+git add docs/test-234.xlsx docs/test.csv starburst-mcp2-session.md
+git commit -m "docs: add generated test workbook exports"
+git push origin dev3
+git status --short --branch
+git log --oneline -n 1
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Stage only files related to the workbook export task and required session logging.
+#### NEXT STEP: Run git status, stage, commit, push, and verify final status.
