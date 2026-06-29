@@ -1023,3 +1023,345 @@ Pending execution.
 #### STATUS: PENDING
 #### OBSERVATIONS: Stage only files related to the workbook export task and required session logging.
 #### NEXT STEP: Run git status, stage, commit, push, and verify final status.
+
+#### EXECUTION RESULT
+```text
+## dev3...origin/dev3
+ M starburst-mcp2-session.md
+?? .vscode/
+?? docs/test-234.xlsx
+?? docs/test-event-ai.xlsx
+?? docs/test.csv
+
+## dev3...origin/dev3
+A  docs/test-234.xlsx
+A  docs/test.csv
+M  starburst-mcp2-session.md
+?? .vscode/
+?? docs/test-event-ai.xlsx
+
+[dev3 afba4e3] docs: add generated test workbook exports
+ Author: selvar2 <selvarajaa13@gmail.com>
+ 3 files changed, 354 insertions(+)
+ create mode 100644 docs/test-234.xlsx
+ create mode 100644 docs/test.csv
+
+Enumerating objects: 9, done.
+Counting objects: 100% (9/9), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (6/6), done.
+Writing objects: 100% (6/6), 114.28 KiB | 22.86 MiB/s, done.
+Total 6 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (2/2), completed with 2 local objects.
+To https://github.com/selvar2/starburst-demo
+   9f4e856..afba4e3  dev3 -> dev3
+## dev3...origin/dev3
+?? .vscode/
+?? docs/test-event-ai.xlsx
+afba4e3 (HEAD -> dev3, origin/dev3) docs: add generated test workbook exports
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Commit afba4e3 was pushed to origin/dev3. Branch is synchronized with origin/dev3 after push. Untracked paths left untouched: .vscode/ and docs/test-event-ai.xlsx.
+#### NEXT STEP: Report commit hash and final status to user.
+
+### [2026-06-26 Generate MD PDF DOCX From Encrypted Workbook]
+#### ACTION TYPE: CLI
+#### PURPOSE: Generate Markdown, PDF, and Word document outputs for docs/test-event-ai.xlsx while accurately documenting encryption limitation
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from pathlib import Path
+import hashlib
+import subprocess
+from zipfile import ZipFile, ZIP_DEFLATED
+from xml.sax.saxutils import escape
+
+base = Path('/workspaces/starburst-demo/docs')
+source = base / 'test-event-ai.xlsx'
+out_md = base / 'test-event-ai.md'
+out_pdf = base / 'test-event-ai.pdf'
+out_docx = base / 'test-event-ai.docx'
+
+source_bytes = source.read_bytes()
+sha256 = hashlib.sha256(source_bytes).hexdigest()
+file_type = subprocess.check_output(['file', '-b', str(source)], text=True).strip()
+content = f'''# test-event-ai.xlsx Extraction Report
+
+## Source
+
+- File: `{source.name}`
+- Path: `{source}`
+- Detected type: `{file_type}`
+- Size: {source.stat().st_size} bytes
+- SHA-256: `{sha256}`
+
+## Extraction Status
+
+Worksheet content could not be extracted because the source file is a DRM-encrypted Office compound document. Inspection found an `EncryptedPackage` stream, and the readable workbook data is unavailable without authorized decryption/access.
+
+No spreadsheet rows or cell values were invented.
+'''
+out_md.write_text(content, encoding='utf-8')
+
+# Minimal valid PDF with the same report text.
+pdf_lines = [
+    'test-event-ai.xlsx Extraction Report',
+    '',
+    f'File: {source.name}',
+    f'Detected type: {file_type}',
+    f'Size: {source.stat().st_size} bytes',
+    f'SHA-256: {sha256}',
+    '',
+    'Extraction Status:',
+    'Worksheet content could not be extracted because the source file is',
+    'a DRM-encrypted Office compound document with an EncryptedPackage stream.',
+    'Readable workbook data is unavailable without authorized decryption/access.',
+    '',
+    'No spreadsheet rows or cell values were invented.',
+]
+
+def pdf_escape(text):
+    return text.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+
+stream = ['BT', '/F1 10 Tf', '72 760 Td']
+for index, line in enumerate(pdf_lines):
+    if index:
+        stream.append('0 -14 Td')
+    stream.append(f'({pdf_escape(line)}) Tj')
+stream.append('ET')
+stream_bytes = '\n'.join(stream).encode('latin-1', 'replace')
+objects = [
+    b'<< /Type /Catalog /Pages 2 0 R >>',
+    b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    b'<< /Length ' + str(len(stream_bytes)).encode() + b' >>\nstream\n' + stream_bytes + b'\nendstream',
+]
+pdf = bytearray(b'%PDF-1.4\n')
+offsets = []
+for number, obj in enumerate(objects, start=1):
+    offsets.append(len(pdf))
+    pdf.extend(f'{number} 0 obj\n'.encode())
+    pdf.extend(obj)
+    pdf.extend(b'\nendobj\n')
+xref = len(pdf)
+pdf.extend(f'xref\n0 {len(objects) + 1}\n'.encode())
+pdf.extend(b'0000000000 65535 f \n')
+for offset in offsets:
+    pdf.extend(f'{offset:010d} 00000 n \n'.encode())
+pdf.extend(f'trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode())
+out_pdf.write_bytes(pdf)
+
+# Minimal DOCX containing the same report text.
+def paragraph(text):
+    return '<w:p><w:r><w:t xml:space="preserve">' + escape(text) + '</w:t></w:r></w:p>'
+
+doc_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' \
+    + ''.join(paragraph(line) for line in content.splitlines()) \
+    + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>'
+with ZipFile(out_docx, 'w', ZIP_DEFLATED) as docx:
+    docx.writestr('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
+    docx.writestr('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
+    docx.writestr('word/document.xml', doc_xml)
+
+for path in (out_md, out_pdf, out_docx):
+    print('generated:', path, path.stat().st_size)
+PY
+file docs/test-event-ai.md docs/test-event-ai.pdf docs/test-event-ai.docx
+ls -l docs/test-event-ai.md docs/test-event-ai.pdf docs/test-event-ai.docx
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Source workbook is already known to be DRM-encrypted, so outputs should document the limitation and metadata.
+#### NEXT STEP: Run generation command and validate created files.
+
+#### EXECUTION RESULT
+```text
+generated: /workspaces/starburst-demo/docs/test-event-ai.md 590
+generated: /workspaces/starburst-demo/docs/test-event-ai.pdf 1220
+generated: /workspaces/starburst-demo/docs/test-event-ai.docx 1346
+docs/test-event-ai.md:   ASCII text
+docs/test-event-ai.pdf:  PDF document, version 1.4, 1 page(s)
+docs/test-event-ai.docx: Microsoft Word 2007+
+-rw-rw-rw- 1 vscode vscode 1346 Jun 26 13:41 docs/test-event-ai.docx
+-rw-rw-rw- 1 vscode vscode  590 Jun 26 13:41 docs/test-event-ai.md
+-rw-rw-rw- 1 vscode vscode 1220 Jun 26 13:41 docs/test-event-ai.pdf
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Markdown, PDF, and DOCX files were generated successfully and file type validation passed.
+#### NEXT STEP: Validate report content and report generated paths to user.
+
+### [2026-06-26 Validate MD PDF DOCX Outputs]
+#### ACTION TYPE: CLI
+#### PURPOSE: Verify generated report content includes source metadata and extraction limitation
+#### PRE-EXECUTION
+```bash
+cat docs/test-event-ai.md
+unzip -p docs/test-event-ai.docx word/document.xml | grep -o "DRM-encrypted\|No spreadsheet rows or cell values were invented" || true
+strings docs/test-event-ai.pdf | grep -E "Extraction Report|DRM-encrypted|No spreadsheet" || true
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Validate that the generated formats contain the intended status report.
+#### NEXT STEP: Run content validation and log output.
+
+#### EXECUTION RESULT
+```text
+# test-event-ai.xlsx Extraction Report
+
+## Source
+
+- File: `test-event-ai.xlsx`
+- Path: `/workspaces/starburst-demo/docs/test-event-ai.xlsx`
+- Detected type: `CDFV2 Encrypted`
+- Size: 121344 bytes
+- SHA-256: `5f6592664c8717b3563c6351a2b79aae4d4166c2922e4bd048acb2e0ea8268cd`
+
+## Extraction Status
+
+Worksheet content could not be extracted because the source file is a DRM-encrypted Office compound document. Inspection found an `EncryptedPackage` stream, and the readable workbook data is unavailable without authorized decryption/access.
+
+No spreadsheet rows or cell values were invented.
+DRM-encrypted
+No spreadsheet rows or cell values were invented
+(test-event-ai.xlsx Extraction Report) Tj
+(a DRM-encrypted Office compound document with an EncryptedPackage stream.) Tj
+(No spreadsheet rows or cell values were invented.) Tj
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Markdown, DOCX XML, and PDF strings contain the intended extraction report content.
+#### NEXT STEP: Report generated files and limitation to user.
+
+### [2026-06-26 Generate JPEG From Encrypted Workbook]
+#### ACTION TYPE: CLI
+#### PURPOSE: Generate docs/a.jpg from docs/test-event-ai.xlsx, rendering first 10 rows if available or a status image if encrypted/unreadable
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from pathlib import Path
+import hashlib
+import subprocess
+from PIL import Image, ImageDraw, ImageFont
+
+base = Path('/workspaces/starburst-demo/docs')
+source = base / 'test-event-ai.xlsx'
+out_jpg = base / 'a.jpg'
+
+source_bytes = source.read_bytes()
+sha256 = hashlib.sha256(source_bytes).hexdigest()
+file_type = subprocess.check_output(['file', '-b', str(source)], text=True).strip()
+size = source.stat().st_size
+
+lines = [
+    'test-event-ai.xlsx - first 10 lines',
+    '',
+    'Workbook rows could not be extracted.',
+    '',
+    f'Source file: {source.name}',
+    f'Detected type: {file_type}',
+    f'Size: {size} bytes',
+    f'SHA-256: {sha256}',
+    '',
+    'Extraction status:',
+    'The source is a DRM-encrypted Office compound document.',
+    'It contains an EncryptedPackage stream, so readable workbook',
+    'rows are unavailable without authorized decryption/access.',
+    '',
+    'No spreadsheet rows or cell values were invented.',
+]
+
+width, height = 1400, 900
+image = Image.new('RGB', (width, height), '#f8fafc')
+draw = ImageDraw.Draw(image)
+try:
+    title_font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+    body_font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 24)
+except OSError:
+    title_font = ImageFont.load_default()
+    body_font = ImageFont.load_default()
+
+margin = 60
+y = 54
+for index, line in enumerate(lines):
+    font = title_font if index == 0 else body_font
+    fill = '#0f172a' if index == 0 else '#1e293b'
+    if line.startswith('Extraction status:'):
+        fill = '#9a3412'
+    draw.text((margin, y), line, font=font, fill=fill)
+    y += 48 if index == 0 else 36
+
+image.save(out_jpg, 'JPEG', quality=92)
+print('generated:', out_jpg, out_jpg.stat().st_size)
+print('source_type:', file_type)
+print('first_10_lines_extracted:', False)
+PY
+file docs/a.jpg
+/usr/local/python/3.13.13/bin/python - <<'PY'
+from PIL import Image
+path = '/workspaces/starburst-demo/docs/a.jpg'
+with Image.open(path) as image:
+    print('format:', image.format)
+    print('size:', image.size)
+    print('mode:', image.mode)
+PY
+```
+#### EXECUTION RESULT
+Pending execution.
+#### STATUS: PENDING
+#### OBSERVATIONS: Previous inspection established source is CDFV2/DRM encrypted, so the JPEG should not invent spreadsheet rows.
+#### NEXT STEP: Run image generation and validate JPEG metadata.
+
+#### EXECUTION RESULT
+```text
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+ModuleNotFoundError: No module named 'PIL'
+docs/a.jpg: cannot open `docs/a.jpg' (No such file or directory)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+ModuleNotFoundError: No module named 'PIL'
+```
+#### STATUS: FAILURE
+#### OBSERVATIONS: Pillow/PIL is not installed in the configured Python environment, so JPEG generation could not run.
+#### NEXT STEP: Install Pillow with the Python package tool and rerun image generation.
+
+### [2026-06-26 Install Pillow For JPEG Generation]
+#### ACTION TYPE: CONFIG
+#### PURPOSE: Install Pillow dependency needed to render docs/a.jpg
+#### PRE-EXECUTION
+```text
+install_python_packages(resourcePath='/workspaces/starburst-demo', packageList=['Pillow'])
+```
+#### EXECUTION RESULT
+```text
+Successfully installed package: Pillow
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: PIL module should now be importable in configured Python environment.
+#### NEXT STEP: Rerun JPEG generation and validation.
+
+### [2026-06-26 Rerun JPEG Generation After Pillow Install]
+#### ACTION TYPE: CLI
+#### PURPOSE: Generate and validate docs/a.jpg after installing Pillow
+#### PRE-EXECUTION
+```bash
+/usr/local/python/3.13.13/bin/python <JPEG generation script>
+file docs/a.jpg
+/usr/local/python/3.13.13/bin/python <PIL validation script>
+```
+#### EXECUTION RESULT
+```text
+generated: /workspaces/starburst-demo/docs/a.jpg 119389
+source_type: CDFV2 Encrypted
+first_10_lines_extracted: False
+docs/a.jpg: JPEG image data, JFIF standard 1.01, aspect ratio, density 1x1, segment length 16, baseline, precision 8, 1400x900, components 3
+format: JPEG
+size: (1400, 900)
+mode: RGB
+```
+#### STATUS: SUCCESS
+#### OBSERVATIONS: Generated a valid JPEG status image. First 10 workbook lines were not extracted because the source is DRM-encrypted.
+#### NEXT STEP: Report generated image path and validation result to user.
