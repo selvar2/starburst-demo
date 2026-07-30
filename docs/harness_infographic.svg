@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="ibg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#05060d"/>
+      <stop offset="1" stop-color="#0a0b16"/>
+    </linearGradient>
+    <linearGradient id="loopP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1638"/><stop offset="1" stop-color="#130f28"/></linearGradient>
+    <linearGradient id="memP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2036"/><stop offset="1" stop-color="#0a1626"/></linearGradient>
+    <linearGradient id="toolP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c2a1c"/><stop offset="1" stop-color="#081e14"/></linearGradient>
+    <linearGradient id="permP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b2a28"/><stop offset="1" stop-color="#071e1c"/></linearGradient>
+    <linearGradient id="obsP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2036"/><stop offset="1" stop-color="#0a1626"/></linearGradient>
+    <linearGradient id="evoP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1030"/><stop offset="1" stop-color="#1e0b24"/></linearGradient>
+    <filter id="iglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#ibg)"/>
+
+  <!-- Eyebrow + Title -->
+  <text x="800" y="42" text-anchor="middle" fill="#4dffa0" font-size="15" font-weight="700" letter-spacing="3">AI IN ACTION  |  AGENT RUNTIME  |  THE SIX LAYERS</text>
+  <text x="800" y="90" text-anchor="middle" fill="#f2f4ff" font-size="40" font-weight="800" font-family="Georgia, serif">The Anatomy of a Harness</text>
+  <text x="800" y="120" text-anchor="middle" fill="#8b93c4" font-size="17">AGENT = <tspan fill="#a99bff" font-weight="700">MODEL</tspan> + <tspan fill="#4dffa0" font-weight="700">HARNESS</tspan> — the model reasons, the harness makes it act</text>
+
+  <!-- Row 1 -->
+  <!-- Panel 1: Loop Engineering -->
+  <g>
+    <rect x="40" y="155" width="490" height="220" rx="16" fill="url(#loopP)" stroke="#6a5fcf" stroke-width="2"/>
+    <circle cx="78" cy="192" r="16" fill="#7a5fff" filter="url(#iglow)"/>
+    <path d="M72 192 a6 6 0 1 1 6 6" stroke="#fff" stroke-width="2" fill="none"/><path d="M78 202 l-3 -4 h6 z" fill="#fff"/>
+    <text x="108" y="198" fill="#c9c2ff" font-size="21" font-weight="800">LOOP ENGINEERING</text>
+    <text x="62" y="234" fill="#8b8fc4" font-size="13.5">The repeating execution cycle around the model —</text>
+    <text x="62" y="254" fill="#8b8fc4" font-size="13.5">trigger, act, verify, update state, repeat.</text>
+    <g font-size="14" font-weight="600" fill="#e0dcff">
+      <rect x="62" y="272" width="406" height="30" rx="7" fill="#2a2350" opacity="0.6"/>
+      <text x="76" y="292">▸ Claude Loop <tspan fill="#9a94c4" font-weight="400">(Boris Cherny / Anthropic)</tspan></text>
+      <rect x="62" y="308" width="406" height="30" rx="7" fill="#2a2350" opacity="0.6"/>
+      <text x="76" y="328">▸ Hermes Loop Engineering</text>
+      <rect x="62" y="344" width="406" height="24" rx="7" fill="#2a2350" opacity="0.6"/>
+      <text x="76" y="361" font-size="13">▸ Meta-Harness <tspan fill="#9a94c4" font-weight="400">(outer loop wrapping inner)</tspan></text>
+    </g>
+  </g>
+
+  <!-- Panel 2: Memory Engineering -->
+  <g>
+    <rect x="555" y="155" width="490" height="220" rx="16" fill="url(#memP)" stroke="#2b7fb6" stroke-width="2"/>
+    <circle cx="593" cy="192" r="16" fill="#2b8fd6" filter="url(#iglow)"/>
+    <path d="M586 190 q7 -8 14 0 q-7 8 -14 0z" fill="#fff"/><circle cx="593" cy="190" r="2.5" fill="#2b8fd6"/>
+    <text x="623" y="198" fill="#9fe0ff" font-size="21" font-weight="800">MEMORY ENGINEERING</text>
+    <text x="577" y="234" fill="#89a6c4" font-size="13.5">Persistent state that survives context resets</text>
+    <text x="577" y="254" fill="#89a6c4" font-size="13.5">and sessions — the agent's long-term recall.</text>
+    <g font-size="14" font-weight="600" fill="#d6ecff">
+      <rect x="577" y="272" width="406" height="30" rx="7" fill="#123044" opacity="0.7"/>
+      <text x="591" y="292">▸ Mem0 · Zep · Honcho</text>
+      <rect x="577" y="308" width="406" height="30" rx="7" fill="#123044" opacity="0.7"/>
+      <text x="591" y="328">▸ Hermes 7-layer Memory OS</text>
+    </g>
+  </g>
+
+  <!-- Panel 3: Tool Execution -->
+  <g>
+    <rect x="1070" y="155" width="490" height="220" rx="16" fill="url(#toolP)" stroke="#1f8e56" stroke-width="2"/>
+    <circle cx="1108" cy="192" r="16" fill="#1f9e5e" filter="url(#iglow)"/>
+    <path d="M1101 185 l7 4 v8 l-7 4 l-7 -4 v-8z" fill="#fff"/>
+    <text x="1138" y="198" fill="#8bf5be" font-size="21" font-weight="800">TOOL EXECUTION</text>
+    <text x="1092" y="234" fill="#8fc7a8" font-size="13.5">The hands — how the agent calls out to the</text>
+    <text x="1092" y="254" fill="#8fc7a8" font-size="13.5">world, runs code, and queries data.</text>
+    <g font-size="14" font-weight="600" fill="#d0f5e0">
+      <rect x="1092" y="272" width="406" height="30" rx="7" fill="#0f3322" opacity="0.7"/>
+      <text x="1106" y="292">▸ MCP Servers</text>
+      <rect x="1092" y="308" width="406" height="30" rx="7" fill="#0f3322" opacity="0.7"/>
+      <text x="1106" y="328">▸ Unity Catalog Functions <tspan fill="#7fb89a" font-weight="400">(Databricks)</tspan></text>
+    </g>
+  </g>
+
+  <!-- Row 2 -->
+  <!-- Panel 4: Permission & Safety -->
+  <g>
+    <rect x="40" y="400" width="490" height="220" rx="16" fill="url(#permP)" stroke="#1f8e86" stroke-width="2"/>
+    <circle cx="78" cy="437" r="16" fill="#1f9e8e" filter="url(#iglow)"/>
+    <path d="M78 428 l8 4 v6 c0 6 -4 9 -8 11 c-4 -2 -8 -5 -8 -11 v-6z" fill="#fff"/>
+    <text x="108" y="443" fill="#8bf5e6" font-size="20" font-weight="800">PERMISSION &amp; SAFETY</text>
+    <text x="62" y="479" fill="#8fc7bf" font-size="13.5">The guardrails — what the agent is allowed to</text>
+    <text x="62" y="499" fill="#8fc7bf" font-size="13.5">touch, with human approval gates for risk.</text>
+    <g font-size="14" font-weight="600" fill="#d0f5ec">
+      <rect x="62" y="517" width="406" height="30" rx="7" fill="#0f3330" opacity="0.7"/>
+      <text x="76" y="537">▸ AutoHarness governance</text>
+      <rect x="62" y="553" width="406" height="30" rx="7" fill="#0f3330" opacity="0.7"/>
+      <text x="76" y="573">▸ OpenHarness PermissionChecker</text>
+    </g>
+  </g>
+
+  <!-- Panel 5: Observability -->
+  <g>
+    <rect x="555" y="400" width="490" height="220" rx="16" fill="url(#obsP)" stroke="#2b7fb6" stroke-width="2"/>
+    <circle cx="593" cy="437" r="16" fill="#2b8fd6" filter="url(#iglow)"/>
+    <path d="M585 445 l4 -6 l4 3 l5 -8 l4 5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="623" y="443" fill="#9fe0ff" font-size="21" font-weight="800">OBSERVABILITY</text>
+    <text x="577" y="479" fill="#89a6c4" font-size="13.5">The eyes — tracing every step, tool call, token,</text>
+    <text x="577" y="499" fill="#89a6c4" font-size="13.5">latency and cost so nothing is a black box.</text>
+    <g font-size="14" font-weight="600" fill="#d6ecff">
+      <rect x="577" y="517" width="406" height="30" rx="7" fill="#123044" opacity="0.7"/>
+      <text x="591" y="537">▸ Arize Phoenix · Langfuse</text>
+      <rect x="577" y="553" width="406" height="30" rx="7" fill="#123044" opacity="0.7"/>
+      <text x="591" y="573">▸ claude-devtools</text>
+    </g>
+  </g>
+
+  <!-- Panel 6: Self-Evolution -->
+  <g>
+    <rect x="1070" y="400" width="490" height="220" rx="16" fill="url(#evoP)" stroke="#a4479a" stroke-width="2"/>
+    <circle cx="1108" cy="437" r="16" fill="#c04a9e" filter="url(#iglow)"/>
+    <path d="M1102 431 a6 6 0 1 0 6 -6 M1108 425 l3 4 M1114 443 a6 6 0 1 0 -6 6 M1108 449 l-3 -4" stroke="#fff" stroke-width="2" fill="none"/>
+    <text x="1138" y="443" fill="#ffb0e6" font-size="21" font-weight="800">SELF-EVOLUTION</text>
+    <text x="1092" y="479" fill="#cf9ac4" font-size="13.5">The frontier — the harness improves its own</text>
+    <text x="1092" y="499" fill="#cf9ac4" font-size="13.5">skills, prompts and tools over time.</text>
+    <g font-size="14" font-weight="600" fill="#ffd6f2">
+      <rect x="1092" y="517" width="406" height="30" rx="7" fill="#331030" opacity="0.7"/>
+      <text x="1106" y="537">▸ Hermes Self-Evolution <tspan fill="#c48fb8" font-weight="400">(DSPy + GEPA)</tspan></text>
+      <rect x="1092" y="553" width="406" height="30" rx="7" fill="#331030" opacity="0.7"/>
+      <text x="1106" y="573">▸ AHE <tspan fill="#c48fb8" font-weight="400">(Agentic Harness Engineering)</tspan></text>
+    </g>
+  </g>
+
+  <!-- Bottom banner -->
+  <g>
+    <rect x="40" y="670" width="1520" height="150" rx="16" fill="#0d1226" stroke="#2a2f52" stroke-width="1.5"/>
+    <circle cx="120" cy="745" r="34" fill="#1a1d3a" stroke="#7a5fff" stroke-width="2"/>
+    <path d="M120 728 l-14 12 h9 v16 h10 v-16 h9z" fill="#a99bff"/>
+    <text x="185" y="722" fill="#f2f4ff" font-size="20" font-weight="700">The model alone can only think.</text>
+    <text x="185" y="752" fill="#c9c2ff" font-size="20" font-weight="700">These six layers are what let it <tspan fill="#4dffa0">perceive, act, remember, and improve.</tspan></text>
+    <text x="185" y="786" fill="#8b93c4" font-size="14.5">Loop → Memory → Tools → Permission → Observability → Self-Evolution : the stack that turns a bare LLM into an autonomous agent.</text>
+  </g>
+
+  <text x="1548" y="866" text-anchor="end" fill="#3a3f5c" font-size="13">Harness Engineering · 2026</text>
+</svg>

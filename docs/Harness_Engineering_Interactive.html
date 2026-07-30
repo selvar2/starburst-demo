@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harness Engineering for AI</title>
+<style>
+  :root{
+    --bg:#0E1626; --bg2:#091020; --panel:#18233B; --panel2:#223052;
+    --teal:#2DD4BF; --tealDk:#14B8A6; --indigo:#818CF8; --indigo2:#6366F1;
+    --amber:#F59E0B; --green:#22C55E; --red:#F87171;
+    --white:#F8FAFC; --lav:#CBD5E1; --slate:#94A3B8; --slate2:#64748B;
+    --line:#25324d; --mist:#131d31;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--lav);font-family:var(--sans);line-height:1.6;font-size:16px}
+  ::selection{background:var(--teal);color:#04201c}
+  /* progress bar */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--teal),var(--indigo));z-index:100;transition:width .1s}
+  /* layout */
+  .wrap{display:grid;grid-template-columns:270px 1fr;max-width:1360px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:28px 18px 40px;border-right:1px solid var(--line);background:var(--bg2)}
+  nav .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  nav .brand .sq{width:22px;height:22px;background:var(--teal);border-radius:5px;flex:none}
+  nav .brand b{color:var(--white);font-size:15px;letter-spacing:.3px}
+  nav .tagline{font-size:11px;color:var(--slate2);margin:0 0 20px 32px;text-transform:uppercase;letter-spacing:2px}
+  nav a{display:block;color:var(--slate);text-decoration:none;font-size:13.5px;padding:7px 12px;border-radius:7px;border-left:2px solid transparent;transition:.15s}
+  nav a:hover{color:var(--white);background:var(--panel)}
+  nav a.part{margin-top:14px;color:var(--teal);font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding-left:12px}
+  nav a.active{color:var(--white);background:var(--panel);border-left:2px solid var(--teal)}
+  main{padding:0}
+  .container{max-width:940px;margin:0 auto;padding:70px 46px 120px}
+  /* hero */
+  .hero{padding:96px 46px 60px;max-width:940px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--teal);letter-spacing:3px;text-transform:uppercase;margin-bottom:16px}
+  h1{font-size:56px;line-height:1.05;color:var(--white);font-weight:800;letter-spacing:-1px;margin-bottom:22px}
+  h1 .accent{color:var(--teal)}
+  .lead{font-size:20px;color:var(--slate);max-width:760px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--white);padding:8px 16px;border-radius:999px;font-size:13px}
+  .chip.teal{border-color:var(--teal)}
+  /* sections */
+  section{scroll-margin-top:20px;padding-top:26px;margin-top:26px}
+  .part-head{border-top:1px solid var(--line);margin-top:60px;padding-top:40px}
+  .kicker{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--teal);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px}
+  h2{font-size:32px;color:var(--white);font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+  h3{font-size:20px;color:var(--white);font-weight:700;margin:30px 0 12px}
+  p{margin-bottom:14px}
+  .muted{color:var(--slate)}
+  .note{font-size:14px;color:var(--slate);font-style:italic;border-left:3px solid var(--indigo);padding:8px 0 8px 16px;margin:18px 0}
+  a.ref{color:var(--teal)}
+  /* callout */
+  .callout{background:linear-gradient(120deg,var(--panel),var(--mist));border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin:26px 0}
+  .eq{font-size:30px;font-weight:800;color:var(--white);letter-spacing:-.5px}
+  .eq .op{color:var(--teal)} .eq .m{color:var(--indigo)} .eq .h{color:var(--teal)}
+  /* cards grid */
+  .grid{display:grid;gap:16px;margin:22px 0}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:.18s}
+  .card:hover{transform:translateY(-3px);border-color:var(--teal)}
+  .card .lyr{width:38px;height:38px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:var(--teal);margin-bottom:12px}
+  .card.ctrl .lyr{color:var(--amber)}
+  .card h4{color:var(--white);font-size:16px;margin-bottom:5px}
+  .card small{color:var(--slate);font-size:13px}
+  /* pillar tabs */
+  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 6px}
+  .tab{cursor:pointer;border:1.5px solid var(--line);background:var(--panel);color:var(--slate);padding:12px 20px;border-radius:10px;font-weight:700;font-size:14px;letter-spacing:.5px;transition:.15s;flex:1;min-width:150px;text-align:center}
+  .tab .n{opacity:.6;margin-right:6px}
+  .tab[data-p="0"].on{border-color:var(--teal);color:var(--teal);background:#0d211f}
+  .tab[data-p="1"].on{border-color:var(--indigo);color:var(--indigo);background:#131634}
+  .tab[data-p="2"].on{border-color:var(--green);color:var(--green);background:#0e2018}
+  .tab[data-p="3"].on{border-color:var(--amber);color:var(--amber);background:#241c0c}
+  .panel-box{background:var(--mist);border:1px solid var(--line);border-radius:14px;padding:26px;margin-top:8px}
+  .panel-box .ptag{color:var(--slate);font-style:italic;margin-bottom:18px}
+  .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .tool{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .tool .dot{width:26px;height:26px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#04201c;font-size:12px}
+  .tool b{display:block;color:var(--white);font-size:13.5px;margin-bottom:8px}
+  .lic{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;color:#04201c}
+  .plat{margin-top:18px;font-size:13.5px;color:var(--lav)}
+  .plat b{font-family:var(--mono);font-size:11px;letter-spacing:1px}
+  /* ecosystem pills */
+  .eco{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--lav)}
+  /* flow */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0;align-items:stretch}
+  .step{flex:1;min-width:104px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center;position:relative}
+  .step b{display:block;color:var(--white);font-size:13.5px}
+  .step small{color:var(--slate);font-size:11px}
+  .step .num{font-family:var(--mono);font-size:10px;color:var(--teal)}
+  /* comparison 3col */
+  .cmp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:22px 0}
+  .cmp .col{border-radius:12px;padding:18px;border:1px solid var(--line)}
+  .cmp .raw{background:#1c1214;border-color:#4c2226}
+  .cmp .mid{background:var(--panel)}
+  .cmp .win{background:#0e2018;border-color:#1f5038}
+  .cmp h5{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+  .cmp .raw h5{color:var(--red)} .cmp .mid h5{color:var(--indigo)} .cmp .win h5{color:var(--green)}
+  .cmp ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .cmp li b{color:var(--white);font-size:13.5px;display:block}
+  .cmp li small{font-size:11.5px}
+  .cmp .raw li small{color:#e5a3a3} .cmp .win li small{color:#8fe6b8} .cmp .mid li small{color:var(--slate)}
+  .cmp .mid li b{color:var(--teal)}
+  /* tables */
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;background:var(--panel);border-radius:10px;overflow:hidden}
+  th{background:var(--bg2);color:var(--white);text-align:left;padding:11px 14px;font-size:13px;letter-spacing:.3px}
+  td{padding:10px 14px;border-top:1px solid var(--line);color:var(--lav)}
+  tr:hover td{background:var(--mist)}
+  .mtx td.c{text-align:center;font-weight:800;font-size:15px}
+  .s{color:var(--teal)} .pp{color:var(--amber)} .mn{color:var(--slate2)}
+  .legend{font-size:13px;color:var(--slate);margin-top:6px}
+  /* two-col value */
+  .do-dont{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+  .do{background:#0d211f;border:1px solid var(--tealDk);border-radius:12px;padding:20px}
+  .dont{background:var(--mist);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .do h4{color:var(--teal)} .dont h4{color:var(--amber)}
+  .do ul,.dont ul{margin-top:12px;padding-left:18px;display:flex;flex-direction:column;gap:9px;font-size:14px}
+  .do li::marker{color:var(--teal)} .dont li::marker{color:var(--amber)}
+  /* stack bands */
+  .band{border-radius:10px;padding:16px 20px;margin-bottom:10px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .band b{color:var(--white);font-size:16px} .band span{color:var(--lav);font-size:13.5px;align-self:center}
+  .b1{background:var(--panel2)} .b2{background:var(--indigo2)} .b3{background:var(--tealDk)} .b4{background:var(--bg2);border:1px solid var(--line)}
+  /* omnigent stack */
+  .ostack{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px;margin:20px 0}
+  .ostack .lvl{border-radius:8px;padding:12px;text-align:center;font-size:13px;margin-bottom:8px}
+  .ostack .top{background:var(--teal);color:#04201c;font-weight:800}
+  .ostack .row{display:flex;gap:8px;margin-bottom:8px}
+  .ostack .row div{flex:1;background:var(--panel2);border:1px solid var(--indigo);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:var(--white)}
+  .ostack .base{background:var(--panel);color:var(--slate);border:1px solid var(--line)}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 18px;margin:10px 0}
+  summary{cursor:pointer;color:var(--white);font-weight:600;padding:10px 0}
+  details ul{padding:6px 0 14px 20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+  footer{border-top:1px solid var(--line);padding:30px 46px 60px;max-width:940px;margin:0 auto;color:var(--slate2);font-size:13px}
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr} nav{display:none}
+    h1{font-size:40px} .g4,.g3,.tools,.cmp,.do-dont{grid-template-columns:1fr 1fr}
+    .container,.hero{padding-left:24px;padding-right:24px}
+  }
+  @media(max-width:560px){.g4,.g3,.g2,.tools,.cmp,.do-dont{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="wrap">
+  <nav id="nav">
+    <div class="brand"><span class="sq"></span><b>Harness Engineering</b></div>
+    <div class="tagline">for AI</div>
+    <a class="part">Part 1 · Foundations</a>
+    <a href="#shift">The shift in engineering</a>
+    <a href="#why">Why it exists</a>
+    <a href="#def">What is a harness?</a>
+    <a href="#etclovg">ETCLOVG taxonomy</a>
+    <a href="#types">Harness types</a>
+    <a class="part">Part 2 · Landscape</a>
+    <a href="#framework">Contain·Orchestrate·Verify·Govern</a>
+    <a href="#ecosystem">Wider ecosystem</a>
+    <a href="#loop">The runtime loop</a>
+    <a href="#rawvs">Raw vs harnessed</a>
+    <a href="#frameworks">Agent frameworks</a>
+    <a href="#evalstack">Eval & observability</a>
+    <a href="#deploy">Deployment & guardrails</a>
+    <a class="part">Part 3 · Optimization</a>
+    <a href="#omnigent">Omnigent meta-harness</a>
+    <a href="#autoharness">Automating the harness</a>
+    <a class="part">Part 4 · Production</a>
+    <a href="#ops">MLOps → AgentOps</a>
+    <a href="#cicd">CI/CD & release</a>
+    <a href="#operate">Operating agents</a>
+    <a class="part">Part 5 · Adoption</a>
+    <a href="#value">Enterprise value</a>
+    <a href="#matrix">Coverage matrix</a>
+    <a href="#practices">Best practices</a>
+    <a href="#refarch">Reference architecture</a>
+    <a href="#outlook">Outlook</a>
+    <a href="#takeaways">Key takeaways</a>
+    <a href="#refs">References</a>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow">Enterprise AI Engineering</div>
+      <h1>Harness Engineering <span class="accent">for AI</span></h1>
+      <p class="lead">The system layer around the model — how reliable, governable AI agents are actually built, evaluated, and shipped to production.</p>
+      <div class="chips">
+        <span class="chip teal">Concepts</span><span class="chip teal">Frameworks</span>
+        <span class="chip teal">Databricks Omnigent</span><span class="chip teal">Production Ops</span>
+        <span class="chip teal">Governance</span>
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- PART 1 -->
+      <div class="part-head" id="p1"><div class="kicker">Part 1</div><h2>Foundations</h2></div>
+
+      <section id="shift">
+        <h3>The shift: prompt → context → harness engineering</h3>
+        <p class="muted">As agents moved from demos to production, the engineering focus climbed the stack. Each phase kept the previous one and added a new layer of control.</p>
+        <div class="grid g3">
+          <div class="card"><div class="num" style="font-family:var(--mono);font-size:12px;color:var(--slate)">~2022–23</div><h4>Prompt Engineering</h4><small>Craft the instruction — wording, examples, formatting to steer a single model call.</small></div>
+          <div class="card"><div style="font-family:var(--mono);font-size:12px;color:var(--slate)">~2023–24</div><h4>Context Engineering</h4><small>Manage what the model sees — retrieval, memory, and context budgets.</small></div>
+          <div class="card" style="border-color:var(--teal)"><div style="font-family:var(--mono);font-size:12px;color:var(--teal)">2025–26</div><h4>Harness Engineering</h4><small>Engineer the whole runtime — execution, tools, orchestration, verification, governance.</small></div>
+        </div>
+        <p class="note">Each phase is additive — harness engineering subsumes the earlier ones as the new frontier of reliability.</p>
+      </section>
+
+      <section id="why">
+        <h3>Why harness engineering exists</h3>
+        <div class="callout"><div class="eq">Agent <span class="op">=</span> <span class="m">Model</span> <span class="op">+</span> <span class="h">Harness</span></div>
+        <p class="muted" style="margin:10px 0 0">The model reasons. The harness does everything else — and it is the primary determinant of reliability at scale.</p></div>
+        <p>Without a harness, raw model calls fail in predictable ways:</p>
+        <div class="grid g4">
+          <div class="card ctrl"><h4>Illegal / unsafe actions</h4><small>Raw models attempt forbidden actions. In one chess benchmark, 78% of a model's losses came from illegal moves.</small></div>
+          <div class="card ctrl"><h4>No state or memory</h4><small>Long-horizon tasks lose context ("context rot"); the agent forgets goals and repeats work.</small></div>
+          <div class="card ctrl"><h4>Unverifiable output</h4><small>Without gates and traces, you can't tell whether a run succeeded or why it failed.</small></div>
+          <div class="card ctrl"><h4>Ungoverned & unshippable</h4><small>No permissions, budgets, or audit means it never clears security or production review.</small></div>
+        </div>
+      </section>
+
+      <section id="def">
+        <h3>What is an agent harness?</h3>
+        <p><b style="color:var(--white)">Definition.</b> The agent harness is the external execution system around a model that organizes a task run — the scaffolding that decides where the agent runs, what it can call, what it sees, how the loop is orchestrated, and whether the result is safe and correct.</p>
+        <p><b style="color:var(--teal)">The central claim.</b> Two systems using the same model can differ hugely in reliability. Benchmark scores are a property of a <i>model–harness–environment</i> system, not the model alone.</p>
+      </section>
+
+      <section id="etclovg">
+        <h3>The ETCLOVG seven-layer taxonomy</h3>
+        <p class="muted">A shared map of what a complete harness contains. The first four layers are the <b style="color:var(--teal)">structural core</b>; the last three are the <b style="color:var(--amber)">control plane</b> that makes a system inspectable, measurable, and safe.</p>
+        <div class="grid g4">
+          <div class="card"><div class="lyr">E</div><h4>Execution</h4><small>Sandboxes, runtimes & where code runs</small></div>
+          <div class="card"><div class="lyr">T</div><h4>Tooling</h4><small>Tool schemas, APIs & MCP interfaces</small></div>
+          <div class="card"><div class="lyr">C</div><h4>Context</h4><small>Retrieval, memory & context budgets</small></div>
+          <div class="card"><div class="lyr">L</div><h4>Lifecycle</h4><small>The agent loop & orchestration</small></div>
+        </div>
+        <div class="grid g3">
+          <div class="card ctrl"><div class="lyr">O</div><h4>Observability</h4><small>Tracing, logging, cost & latency</small></div>
+          <div class="card ctrl"><div class="lyr">V</div><h4>Verification</h4><small>Evaluation, validation gates & feedback</small></div>
+          <div class="card ctrl"><div class="lyr">G</div><h4>Governance</h4><small>Permissions, policy, audit & human oversight</small></div>
+        </div>
+      </section>
+
+      <section id="types">
+        <h3>Common harness types you'll deploy</h3>
+        <div class="grid g4">
+          <div class="card"><h4>Evaluation</h4><small>Scores runs against datasets & rubrics</small></div>
+          <div class="card"><h4>Testing</h4><small>Regression & scenario tests for agents</small></div>
+          <div class="card"><h4>Agent</h4><small>The core reason–act–observe loop</small></div>
+          <div class="card"><h4>Multi-Agent</h4><small>Roles, handoffs & shared state</small></div>
+          <div class="card"><h4>Retrieval / Memory</h4><small>RAG + short & long-term memory</small></div>
+          <div class="card"><h4>Deployment</h4><small>Serving, scaling & versioning</small></div>
+          <div class="card"><h4>Safety / Guardrail</h4><small>Input/output filters & constraints</small></div>
+          <div class="card"><h4>Governance</h4><small>Policy, audit & human approval</small></div>
+        </div>
+      </section>
+
+      <!-- PART 2 -->
+      <div class="part-head" id="p2"><div class="kicker">Part 2</div><h2>The Framework Landscape</h2></div>
+
+      <section id="framework">
+        <h3>A practical framework — click a pillar</h3>
+        <p class="muted">A practical way to group the seven ETCLOVG layers into four pillars, each with real open-source projects and platforms.</p>
+        <div class="tabs" id="tabs">
+          <div class="tab on" data-p="0"><span class="n">1</span>CONTAIN</div>
+          <div class="tab" data-p="1"><span class="n">2</span>ORCHESTRATE</div>
+          <div class="tab" data-p="2"><span class="n">3</span>VERIFY</div>
+          <div class="tab" data-p="3"><span class="n">4</span>GOVERN</div>
+        </div>
+        <div class="panel-box" id="pillar"></div>
+      </section>
+
+      <section id="ecosystem">
+        <h3>More of the harness ecosystem</h3>
+        <p class="muted">Beyond the four pillars — the fuller open-source toolchain, grouped by where it fits.</p>
+        <h4 style="color:var(--indigo);font-size:15px;margin-top:18px">Agent &amp; workflow frameworks</h4>
+        <div class="eco" id="eco0"></div>
+        <h4 style="color:var(--teal);font-size:15px;margin-top:18px">Context, memory &amp; serving</h4>
+        <div class="eco" id="eco1"></div>
+        <h4 style="color:var(--green);font-size:15px;margin-top:18px">Eval, tracing &amp; observability</h4>
+        <div class="eco" id="eco2"></div>
+        <h4 style="color:var(--amber);font-size:15px;margin-top:18px">Guardrails, policy &amp; security</h4>
+        <div class="eco" id="eco3"></div>
+      </section>
+
+      <section id="loop">
+        <h3>What happens on every run</h3>
+        <p class="muted">A task moves through <b style="color:var(--teal)">contain → orchestrate → verify → govern</b>. Failures retry or escalate; only verified, approved work ships.</p>
+        <div class="flow" id="flow"></div>
+        <div class="grid g2">
+          <div class="card" style="border-color:#4c2226;background:#1c1214"><h4 style="color:var(--red)">↺ Retry / re-plan</h4><small>If Observe or Verify fails, the loop re-plans or retries with a different tool or model — bounded by a budget so it can't spin forever.</small></div>
+          <div class="card" style="border-color:var(--tealDk);background:#0d211f"><h4 style="color:var(--teal)">↑ Escalate on evidence</h4><small>Premium reasoning and human approval are escalation paths triggered by complexity, risk, or a failed check — not the default road.</small></div>
+        </div>
+      </section>
+
+      <section id="rawvs">
+        <h3>From a raw model call to a harnessed agent</h3>
+        <div class="cmp">
+          <div class="col raw"><h5>Raw model call</h5><ul>
+            <li><b>Scans the whole repo</b><small>far more context than needed</small></li>
+            <li><b>Every tool wide open</b><small>unbounded from step one</small></li>
+            <li><b>Premium model by default</b><small>heavy reasoning for trivial steps</small></li>
+            <li><b>No trace, no gate</b><small>"hope it worked"</small></li>
+          </ul></div>
+          <div class="col mid"><h5>The harness · ETCLOVG</h5><ul>
+            <li><b>Contain</b><small>sandbox + scoped tools (E,T)</small></li>
+            <li><b>Orchestrate</b><small>context, memory, loop (C,L)</small></li>
+            <li><b>Observe</b><small>traces, cost, latency (O)</small></li>
+            <li><b>Verify · Govern</b><small>gates, policy, budget, approval (V,G)</small></li>
+          </ul></div>
+          <div class="col win"><h5>Harnessed agent</h5><ul>
+            <li><b>Scope only what's needed</b><small>relevant modules, not the repo</small></li>
+            <li><b>Right model per step</b><small>escalate to premium rarely</small></li>
+            <li><b>Everything observable</b><small>traces, cost, retries, latency</small></li>
+            <li><b>Ship only verified work</b><small>gate + policy + approval</small></li>
+          </ul></div>
+        </div>
+      </section>
+
+      <section id="frameworks">
+        <h3>Agent &amp; orchestration frameworks</h3>
+        <table><thead><tr><th>Framework</th><th>Type</th><th>Harness strength</th><th>License</th></tr></thead><tbody>
+          <tr><td><b style="color:var(--white)">LangChain / LangGraph</b></td><td>Agent + graph orchestration</td><td>Lifecycle, tooling, stateful graphs</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">CrewAI</b></td><td>Multi-agent roles</td><td>Role/team orchestration</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">Microsoft AutoGen</b></td><td>Conversational multi-agent</td><td>Agent loops & handoffs</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">Semantic Kernel</b></td><td>Enterprise SDK (MS)</td><td>Planners, plugins, .NET/Python</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">LlamaIndex</b></td><td>Data / RAG framework</td><td>Context & retrieval</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">DSPy</b></td><td>Declarative optimization</td><td>Prompt/pipeline compilation</td><td>Open source</td></tr>
+          <tr><td><b style="color:var(--white)">OpenAI Agents SDK</b></td><td>Agent runtime</td><td>Tooling & handoffs</td><td>Open source</td></tr>
+        </tbody></table>
+        <p class="note">Workflow engines — Temporal, Prefect, Dagster, Airflow, and Argo Workflows — provide the durable, retryable execution substrate many production agent lifecycles run on.</p>
+      </section>
+
+      <section id="evalstack">
+        <h3>Evaluation &amp; observability stack</h3>
+        <div class="grid g3">
+          <div class="card"><h4 style="color:var(--teal)">Evaluation</h4><small>LangSmith · Braintrust · DeepEval · Ragas · Promptfoo · OpenAI Evals · TruLens</small></div>
+          <div class="card"><h4 style="color:var(--indigo)">Observability &amp; tracing</h4><small>Langfuse · Arize Phoenix · Helicone · Weights & Biases · WhyLabs · Evidently AI</small></div>
+          <div class="card"><h4 style="color:var(--amber)">Prompt &amp; experiment mgmt</h4><small>PromptLayer · Humanloop · LangSmith · Promptfoo</small></div>
+        </div>
+      </section>
+
+      <section id="deploy">
+        <h3>Deployment platforms &amp; guardrails</h3>
+        <div class="grid g2">
+          <div class="card"><h4 style="color:var(--teal)">Deployment &amp; serving</h4><small>Databricks Mosaic AI · AWS Bedrock · Google Vertex AI · Azure AI Foundry · Ray Serve · BentoML · KServe · MLflow · Harness.io (CD/GitOps)</small></div>
+          <div class="card"><h4 style="color:var(--amber)">Guardrails &amp; security</h4><small>NVIDIA NeMo Guardrails · Guardrails AI · Lakera (prompt-injection) · Protect AI (ML security) · AEGIS-style tool firewalls</small></div>
+        </div>
+        <p class="note">Harness.io is a CI/CD &amp; software-delivery platform — distinct from the agent-"harness" concept, though increasingly used to ship AI workloads.</p>
+      </section>
+
+      <!-- PART 3 -->
+      <div class="part-head" id="p3"><div class="kicker">Part 3</div><h2>Harness Optimization</h2></div>
+
+      <section id="omnigent">
+        <h3>Omnigent — the meta-harness (Databricks)</h3>
+        <p class="muted">Databricks' open-source (Apache-2.0) meta-harness sits one level above coding agents, treating each harness as an interchangeable part of a larger system.</p>
+        <div class="grid g2">
+          <div class="card"><h4>1 · Common interface</h4><small>One API wraps Claude Code, Codex, Cursor, Pi & SDKs (plus LangGraph, CrewAI, Agno).</small></div>
+          <div class="card"><h4>2 · Swap in one line</h4><small>Define an agent in a short YAML file; change harness or model without rewriting tools or prompts.</small></div>
+          <div class="card"><h4>3 · Policies &amp; sandboxing</h4><small>Budgets, approval gates, and secure sandboxes keep agents in check.</small></div>
+          <div class="card"><h4>4 · Real-time collaboration</h4><small>Share a live agent session by URL; teammates review, comment & steer together.</small></div>
+        </div>
+        <div class="ostack">
+          <div class="lvl top">OMNIGENT · meta-harness (compose · govern · share)</div>
+          <div class="row"><div>Claude Code</div><div>Codex</div><div>Cursor</div><div>Pi</div><div>Custom / SDK</div></div>
+          <div class="lvl base">Foundation models (via AI Gateway)</div>
+        </div>
+        <p class="note">Managed on Databricks: Unity AI Gateway governance + sandboxes. It is the runtime engine behind Agent Bricks.</p>
+      </section>
+
+      <section id="autoharness">
+        <h3>Automating the harness itself</h3>
+        <p class="muted">If the harness drives reliability, the next step is to optimize or synthesize it automatically — three complementary 2026 approaches (from separate teams, <b>not</b> Databricks products):</p>
+        <div class="grid g3">
+          <div class="card"><h4 style="color:var(--teal)">Meta-Harness</h4><small style="color:var(--slate);display:block;margin-bottom:6px">Lee et al., 2026</small><small>Frames harness design as end-to-end optimization over model-facing infrastructure — a loop that proposes, validates & scores improvements to prompts, tools & policies.</small></div>
+          <div class="card"><h4 style="color:var(--indigo)">AutoHarness</h4><small style="color:var(--slate);display:block;margin-bottom:6px">Lou et al. (DeepMind), 2026</small><small>Synthesizes runtime constraint harnesses from tool schemas. Gemini-2.5-Flash + AutoHarness eliminated all illegal moves and beat larger models — cheaper and more capable.</small></div>
+          <div class="card"><h4 style="color:var(--amber)">NL Agent Harnesses</h4><small style="color:var(--slate);display:block;margin-bottom:6px">NLAH + IHR, 2026</small><small>Harness logic as editable natural-language documents run by an Intelligent Harness Runtime — domain experts tune orchestration without code.</small></div>
+        </div>
+      </section>
+
+      <!-- PART 4 -->
+      <div class="part-head" id="p4"><div class="kicker">Part 4</div><h2>Production AI Operations</h2></div>
+
+      <section id="ops">
+        <h3>From MLOps to LLMOps to AgentOps</h3>
+        <div class="grid g3">
+          <div class="card"><h4>MLOps</h4><small>Train, version & deploy models. Data/feature pipelines, model registry, drift monitoring.</small><p style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--teal)">unit: models as artifacts</p></div>
+          <div class="card"><h4>LLMOps</h4><small>Manage prompts, RAG, evals, and inference cost/latency for foundation-model apps.</small><p style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--teal)">unit: prompts + context</p></div>
+          <div class="card" style="border-color:var(--teal)"><h4>AgentOps</h4><small>Operate autonomous multi-step agents: trace loops, gate on evals, enforce policy & budgets, human approval.</small><p style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--teal)">unit: the whole harness</p></div>
+        </div>
+        <p class="note">AgentOps keeps everything from ML/LLMOps and adds trace-level operability, continuous evaluation, and governance for autonomous behavior.</p>
+      </section>
+
+      <section id="cicd">
+        <h3>CI/CD &amp; progressive release for agents</h3>
+        <div class="flow">
+          <div class="step"><b>Commit</b><small>harness as code</small></div>
+          <div class="step"><b>Eval Gate</b><small>offline + regression</small></div>
+          <div class="step"><b>Stage</b><small>shadow / canary</small></div>
+          <div class="step"><b>Approve</b><small>human + policy</small></div>
+          <div class="step"><b>Release</b><small>progressive rollout</small></div>
+        </div>
+        <div class="grid g4">
+          <div class="card"><h4>Canary</h4><small>Small % of traffic first; watch metrics before scaling.</small></div>
+          <div class="card"><h4>Blue-Green</h4><small>Two live versions; switch and roll back instantly.</small></div>
+          <div class="card"><h4>Shadow</h4><small>Mirror real traffic without serving output.</small></div>
+          <div class="card"><h4>A/B testing</h4><small>Split users to compare quality, cost & satisfaction.</small></div>
+        </div>
+      </section>
+
+      <section id="operate">
+        <h3>Operating agents: observe, evaluate, respond</h3>
+        <div class="grid g2">
+          <div class="card"><h4>Trace everything</h4><small>Capture the full run — prompts, tool calls, retrievals, tokens, latency — as replayable traces.</small></div>
+          <div class="card"><h4>Continuous evaluation</h4><small>Score live traffic against rubrics & regression sets; alert on quality regressions, not just errors.</small></div>
+          <div class="card"><h4>Cost &amp; latency SLOs</h4><small>Budget tokens and set service-level objectives; throttle or downgrade models under pressure.</small></div>
+          <div class="card"><h4>Incident response</h4><small>Replay failing traces, roll back the harness version, and add the case to the regression suite.</small></div>
+        </div>
+      </section>
+
+      <!-- PART 5 -->
+      <div class="part-head" id="p5"><div class="kicker">Part 5</div><h2>Adoption, Value &amp; Roadmap</h2></div>
+
+      <section id="value">
+        <h3>Why organizations adopt harness engineering</h3>
+        <div class="grid g3">
+          <div class="card"><h4>Engineering</h4><small>Swap models/harnesses without rewrites; reuse tooling & context across agents.</small></div>
+          <div class="card"><h4>QA &amp; Eval</h4><small>Regression suites and eval gates make agent quality measurable and repeatable.</small></div>
+          <div class="card"><h4>Operations</h4><small>Traces, SLOs, and rollback turn opaque agents into operable services.</small></div>
+          <div class="card"><h4>Security &amp; Risk</h4><small>Permissions, sandboxes, and audit satisfy governance and compliance review.</small></div>
+          <div class="card"><h4>Business &amp; Clients</h4><small>Faster, safer releases and fewer hallucinations build trust and protect ROI.</small></div>
+          <div class="card"><h4>Leadership</h4><small>A portable platform reduces lock-in and scales AI across many use cases.</small></div>
+        </div>
+      </section>
+
+      <section id="matrix">
+        <h3>Framework × harness-layer coverage</h3>
+        <table class="mtx"><thead><tr><th>Tool</th><th>Exec</th><th>Tool</th><th>Ctx</th><th>Lifecycle</th><th>Observ</th><th>Verify</th><th>Govern</th></tr></thead><tbody id="mtx"></tbody></table>
+        <p class="legend"><span class="s">●</span> strong &nbsp; <span class="pp">◐</span> partial &nbsp; <span class="mn">○</span> minimal / out of scope &nbsp;—&nbsp; illustrative, not exhaustive; validate against current docs.</p>
+      </section>
+
+      <section id="practices">
+        <h3>Best practices — do this, not that</h3>
+        <div class="do-dont">
+          <div class="do"><h4>✓ Do</h4><ul>
+            <li>Treat the harness as code — version prompts, tools & policies together.</li>
+            <li>Report the harness with every eval; capture full traces.</li>
+            <li>Gate releases on evals; ship progressively (canary/shadow).</li>
+            <li>Budget context & tokens; design for cost–quality–speed trade-offs.</li>
+            <li>Enforce least-privilege tools, sandboxes, and human approval on risky actions.</li>
+          </ul></div>
+          <div class="dont"><h4>✗ Avoid</h4><ul>
+            <li>Chasing bigger models to fix reliability the harness should handle.</li>
+            <li>Comparing agents on model scores alone (scores are harness-dependent).</li>
+            <li>Shipping without validation gates, rollback, or audit trails.</li>
+            <li>Hard-coding orchestration so it can't be inspected, transferred, or ablated.</li>
+            <li>Unbounded tool access with no budgets, permissions, or oversight.</li>
+          </ul></div>
+        </div>
+      </section>
+
+      <section id="refarch">
+        <h3>Reference architecture — an enterprise agent platform</h3>
+        <div class="band b1"><b>Interfaces</b><span>Chat · IDE · API · workflow triggers</span></div>
+        <div class="band b2"><b>Orchestration (meta-harness)</b><span>Omnigent-style layer · compose & swap harnesses · multi-agent handoffs</span></div>
+        <div class="band b3"><b>Harness core · E T C L</b><span>Sandboxed execution · MCP tools · RAG + memory · agent loop</span></div>
+        <div class="band b4"><b>Control plane · O V G</b><span>Tracing & evals · guardrails · Unity/AI-gateway governance · audit</span></div>
+        <p class="note">Data, models & secrets stay in your cloud; the platform stays portable and governed end-to-end.</p>
+      </section>
+
+      <section id="outlook">
+        <h3>Where harness engineering is heading</h3>
+        <div class="grid g2">
+          <div class="card"><h4>Self-optimizing harnesses</h4><small>Meta-harnesses and AutoHarness-style synthesis tune scaffolding automatically from traces.</small></div>
+          <div class="card"><h4>Natural-language control</h4><small>Editable NL harness documents let domain experts steer agents without code.</small></div>
+          <div class="card"><h4>Standard interfaces</h4><small>MCP, A2A, and common harness APIs make agents and harnesses interchangeable.</small></div>
+          <div class="card"><h4>AI factories &amp; platforms</h4><small>Fleets of governed agents managed as a portfolio on shared enterprise platforms.</small></div>
+        </div>
+      </section>
+
+      <section id="takeaways">
+        <h3>Key takeaways — the harness is the product</h3>
+        <div class="grid g3">
+          <div class="card" style="border-color:var(--teal)"><div class="lyr">01</div><h4>Reliability lives in the harness</h4><small>Same model, different harness = very different results. Engineer the whole runtime.</small></div>
+          <div class="card" style="border-color:var(--indigo)"><div class="lyr" style="color:var(--indigo)">02</div><h4>Use ETCLOVG as your checklist</h4><small>Cover execution, tools, context, lifecycle, observability, verification & governance.</small></div>
+          <div class="card" style="border-color:var(--green)"><div class="lyr" style="color:var(--green)">03</div><h4>Adopt a meta-harness early</h4><small>Omnigent-style layers let you compose, govern & swap agents without rewrites.</small></div>
+        </div>
+        <details><summary>90-day roadmap</summary><ul>
+          <li>① Instrument tracing + evals on one agent.</li>
+          <li>② Add validation gates & rollback to CI/CD.</li>
+          <li>③ Introduce a meta-harness layer.</li>
+          <li>④ Stand up governance: policy, budgets, audit.</li>
+        </ul></details>
+      </section>
+
+      <section id="refs">
+        <h3>References &amp; further reading</h3>
+        <ul style="padding-left:18px;display:flex;flex-direction:column;gap:10px;font-size:14px">
+          <li><i>Agent Harness Engineering: A Survey</i> — ETCLOVG seven-layer taxonomy (OpenReview, 2026).</li>
+          <li><i>Agent Harness for LLM Agents: A Survey</i> — six-component model H=(E,T,C,S,L,V); Awesome-Agent-Harness catalog.</li>
+          <li>Databricks — <i>Introducing Omnigent: A Meta-Harness to Combine, Control and Share Your Agents</i> (2026).</li>
+          <li>Lee et al. — <i>Meta-Harness: End-to-End Optimization of Model Harnesses</i> (arXiv, 2026).</li>
+          <li>Lou et al. — <i>AutoHarness: Improving LLM Agents by Automatically Synthesizing a Code Harness</i> (arXiv 2603.03329, 2026).</li>
+          <li><i>Natural-Language Agent Harnesses</i> + Intelligent Harness Runtime (arXiv 2603.25723, 2026).</li>
+          <li>OpenAI — <i>Harness engineering: leveraging Codex in an agent-first world</i> (2026).</li>
+        </ul>
+      </section>
+    </div>
+    <footer>Product names and capabilities are current as of mid-2026 and evolve quickly; verify against primary sources before architectural decisions.</footer>
+  </main>
+</div>
+
+<script>
+// ---- data ----
+const pillars = [
+  {name:"CONTAIN", color:"var(--teal)", tag:"Sandbox it & give scoped tools",
+   tools:[["E2B","Apache-2.0"],["Firecracker","Apache-2.0"],["gVisor","Apache-2.0"],["MCP","MIT"]],
+   plat:"Modal · Daytona · Northflank · Fly Machines"},
+  {name:"ORCHESTRATE", color:"var(--indigo)", tag:"Manage context, memory & the loop",
+   tools:[["LangGraph","MIT"],["CrewAI","MIT"],["Temporal","MIT"],["Mem0","Apache-2.0"]],
+   plat:"Bedrock · Vertex · Azure AI Foundry · Mosaic AI"},
+  {name:"VERIFY", color:"var(--green)", tag:"Trace every run, gate on evals",
+   tools:[["Langfuse","MIT"],["Ragas","Apache-2.0"],["DeepEval","Apache-2.0"],["promptfoo","MIT"]],
+   plat:"LangSmith · Braintrust · Arize · Galileo"},
+  {name:"GOVERN", color:"var(--amber)", tag:"Enforce policy, guardrails & approval",
+   tools:[["NeMo Guardrails","Apache-2.0"],["Guardrails AI","Apache-2.0"],["OPA","Apache-2.0"],["Presidio","MIT"]],
+   plat:"Lakera · Protect AI · Robust Intelligence"},
+];
+function renderPillar(i){
+  const p=pillars[i], c=p.color;
+  document.getElementById('pillar').innerHTML =
+    `<div class="ptag" style="color:${c}"><b>${p.name}</b> — ${p.tag}</div>
+     <div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;color:${c};margin-bottom:10px">OPEN-SOURCE PROJECTS</div>
+     <div class="tools">${p.tools.map(t=>`
+        <div class="tool">
+          <div class="dot" style="background:${c}">${t[0][0]}</div>
+          <b>${t[0]}</b>
+          <span class="lic" style="background:${c}">${t[1]}</span>
+        </div>`).join('')}</div>
+     <div class="plat"><b style="color:${c}">PLATFORMS </b>${p.plat}</div>`;
+}
+document.querySelectorAll('#tabs .tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on'); renderPillar(+t.dataset.p);
+  };
+});
+renderPillar(0);
+
+// ---- ecosystem pills ----
+const eco=[
+ ['AutoGen','Semantic Kernel','LlamaIndex','DSPy','Haystack','PydanticAI','SmolAgents','Agno','Prefect','Dagster','Airflow','Argo'],
+ ['Milvus','Weaviate','Zep','LMCache','vLLM','SGLang','Ray Serve','BentoML','KServe','Repomix','GraphRAG'],
+ ['OpenLIT','Arize Phoenix','Evidently','Helicone','TruLens','OpenAI Evals','W&B Weave','LangSmith'],
+ ['Llama Guard','Rebuff','Garak','PromptGuard','OPA / Gatekeeper','Prompt Security','Robust Intelligence'],
+];
+eco.forEach((g,i)=>{ document.getElementById('eco'+i).innerHTML = g.map(x=>`<span class="pill">${x}</span>`).join(''); });
+
+// ---- runtime loop ----
+const steps=[["Task in","goal + limits"],["Plan","decompose"],["Tool call","scoped MCP"],["Execute","in sandbox"],["Observe","trace + cost"],["Verify","eval gate"],["Govern","policy + OK"],["Deliver","accepted"]];
+document.getElementById('flow').innerHTML = steps.map((s,i)=>`<div class="step"><div class="num">${String(i+1).padStart(2,'0')}</div><b>${s[0]}</b><small>${s[1]}</small></div>`).join('');
+
+// ---- matrix ----
+const mtx=[
+ ["LangGraph",["◐","●","●","●","◐","◐","○"]],
+ ["CrewAI / AutoGen",["○","●","◐","●","○","○","○"]],
+ ["LangSmith / Braintrust",["○","○","○","○","●","●","◐"]],
+ ["Bedrock / Vertex / Mosaic",["●","●","◐","◐","●","◐","●"]],
+ ["Omnigent (meta-harness)",["●","●","●","●","◐","◐","●"]],
+ ["NeMo / Guardrails AI",["○","◐","○","○","○","◐","●"]],
+];
+const cls=v=>v==="●"?"s":(v==="◐"?"pp":"mn");
+document.getElementById('mtx').innerHTML = mtx.map(r=>
+  `<tr><td><b style="color:var(--white)">${r[0]}</b></td>${r[1].map(v=>`<td class="c ${cls(v)}">${v}</td>`).join('')}</tr>`
+).join('');
+
+// ---- scroll progress + active nav ----
+const bar=document.getElementById('progress');
+window.addEventListener('scroll',()=>{
+  const h=document.documentElement.scrollHeight-innerHeight;
+  bar.style.width=(scrollY/h*100)+'%';
+});
+const links=[...document.querySelectorAll('nav a[href^="#"]')];
+const map={}; links.forEach(a=>map[a.getAttribute('href').slice(1)]=a);
+const obs=new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting){
+    links.forEach(l=>l.classList.remove('active'));
+    const a=map[e.target.id]; if(a)a.classList.add('active');
+  }});
+},{rootMargin:"-20% 0px -70% 0px"});
+document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 720" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0e1f"/>
+      <stop offset="1" stop-color="#0d1226"/>
+    </linearGradient>
+    <linearGradient id="purpleCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1d3a"/>
+      <stop offset="1" stop-color="#141731"/>
+    </linearGradient>
+    <linearGradient id="greenCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f2a1e"/>
+      <stop offset="1" stop-color="#0c2119"/>
+    </linearGradient>
+    <linearGradient id="blueCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e2438"/>
+      <stop offset="1" stop-color="#0b1c2c"/>
+    </linearGradient>
+    <linearGradient id="tealCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d2830"/>
+      <stop offset="1" stop-color="#0a1f26"/>
+    </linearGradient>
+    <linearGradient id="pinkCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1230"/>
+      <stop offset="1" stop-color="#210e26"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1300" height="720" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="650" y="52" text-anchor="middle" fill="#e8eaf6" font-size="30" font-weight="700">Harness Engineering</text>
+  <text x="650" y="80" text-anchor="middle" fill="#8b93c4" font-size="15">The runtime layers that turn a bare model into an autonomous agent</text>
+
+  <!-- Entry blocks -->
+  <!-- Model -->
+  <g>
+    <rect x="40" y="300" width="150" height="120" rx="14" fill="url(#purpleCard)" stroke="#4a4f8a" stroke-width="1.5"/>
+    <circle cx="115" cy="345" r="20" fill="none" stroke="#8b7fff" stroke-width="2.5"/>
+    <circle cx="115" cy="345" r="7" fill="#8b7fff"/>
+    <text x="115" y="392" text-anchor="middle" fill="#e8eaf6" font-size="17" font-weight="700">Model</text>
+    <text x="115" y="410" text-anchor="middle" fill="#9aa0cf" font-size="11">reasons</text>
+  </g>
+
+  <!-- arrow -->
+  <path d="M195 360 L235 360" stroke="#555b8a" stroke-width="2.5" marker-end="url(#ar)"/>
+
+  <!-- Harness Core -->
+  <g>
+    <rect x="240" y="290" width="165" height="140" rx="14" fill="url(#purpleCard)" stroke="#7a5fff" stroke-width="2"/>
+    <path d="M322 322 l-16 14 h10 v18 h12 v-18 h10 z M322 402 l16 -14 h-10 v-18 h-12 v18 h-10 z" fill="#a99bff" filter="url(#glow)"/>
+    <text x="322" y="380" text-anchor="middle" fill="#e8eaf6" font-size="16" font-weight="700">Harness</text>
+    <text x="322" y="398" text-anchor="middle" fill="#9aa0cf" font-size="11">the runtime wrapper</text>
+  </g>
+
+  <!-- Branch decision node -->
+  <g>
+    <path d="M455 360 L505 305 L555 360 L505 415 Z" fill="url(#purpleCard)" stroke="#7a5fff" stroke-width="2"/>
+    <text x="505" y="352" text-anchor="middle" fill="#e8eaf6" font-size="12" font-weight="700">Six</text>
+    <text x="505" y="368" text-anchor="middle" fill="#e8eaf6" font-size="12" font-weight="700">Layers</text>
+  </g>
+  <path d="M405 360 L450 360" stroke="#555b8a" stroke-width="2.5" marker-end="url(#ar)"/>
+
+  <!-- connector trunk from diamond -->
+  <path d="M555 360 L590 360" stroke="#7a5fff" stroke-width="2.5" fill="none"/>
+  <path d="M590 100 L590 620" stroke="#7a5fff" stroke-width="2.5" fill="none" opacity="0.5"/>
+
+  <!-- Layer cards (6) on the right -->
+  <!-- geometry helper: cards start x=640, width=470 -->
+
+  <!-- 1 Loop Engineering -->
+  <g>
+    <path d="M590 130 L640 130" stroke="#a99bff" stroke-width="2.5" fill="none" marker-end="url(#arP)"/>
+    <circle cx="628" cy="130" r="14" fill="#7a5fff"/>
+    <text x="628" y="135" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">1</text>
+    <rect x="648" y="98" width="480" height="66" rx="12" fill="url(#purpleCard)" stroke="#6a5fcf" stroke-width="1.5"/>
+    <text x="672" y="124" fill="#c9c2ff" font-size="16" font-weight="700">🔄 Loop Engineering</text>
+    <text x="672" y="148" fill="#9aa0cf" font-size="12.5">Claude Loop (Boris Cherny) · Hermes Loop · Meta-Harness (outer wraps inner)</text>
+  </g>
+
+  <!-- 2 Memory Engineering -->
+  <g>
+    <path d="M590 210 L640 210" stroke="#5fd0ff" stroke-width="2.5" fill="none" marker-end="url(#arB)"/>
+    <circle cx="628" cy="210" r="14" fill="#2b8fd6"/>
+    <text x="628" y="215" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">2</text>
+    <rect x="648" y="178" width="480" height="66" rx="12" fill="url(#blueCard)" stroke="#2b7fb6" stroke-width="1.5"/>
+    <text x="672" y="204" fill="#9fe0ff" font-size="16" font-weight="700">🧠 Memory Engineering</text>
+    <text x="672" y="228" fill="#93b6cf" font-size="12.5">Mem0 · Zep · Honcho · Hermes 7-layer Memory OS</text>
+  </g>
+
+  <!-- 3 Tool Execution -->
+  <g>
+    <path d="M590 290 L640 290" stroke="#5fffa8" stroke-width="2.5" fill="none" marker-end="url(#arG)"/>
+    <circle cx="628" cy="290" r="14" fill="#1f9e5e"/>
+    <text x="628" y="295" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">3</text>
+    <rect x="648" y="258" width="480" height="66" rx="12" fill="url(#greenCard)" stroke="#1f8e56" stroke-width="1.5"/>
+    <text x="672" y="284" fill="#8bf5be" font-size="16" font-weight="700">🛠️ Tool Execution Layer</text>
+    <text x="672" y="308" fill="#8fc7a8" font-size="12.5">MCP Servers · Unity Catalog Functions (Databricks)</text>
+  </g>
+
+  <!-- 4 Permission & Safety -->
+  <g>
+    <path d="M590 370 L640 370" stroke="#5fffa8" stroke-width="2.5" fill="none" marker-end="url(#arG)"/>
+    <circle cx="628" cy="370" r="14" fill="#1f9e5e"/>
+    <text x="628" y="375" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">4</text>
+    <rect x="648" y="338" width="480" height="66" rx="12" fill="url(#tealCard)" stroke="#1f8e86" stroke-width="1.5"/>
+    <text x="672" y="364" fill="#8bf5e6" font-size="16" font-weight="700">🔐 Permission &amp; Safety Layer</text>
+    <text x="672" y="388" fill="#8fc7bf" font-size="12.5">AutoHarness governance · OpenHarness PermissionChecker</text>
+  </g>
+
+  <!-- 5 Observability -->
+  <g>
+    <path d="M590 450 L640 450" stroke="#5fd0ff" stroke-width="2.5" fill="none" marker-end="url(#arB)"/>
+    <circle cx="628" cy="450" r="14" fill="#2b8fd6"/>
+    <text x="628" y="455" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">5</text>
+    <rect x="648" y="418" width="480" height="66" rx="12" fill="url(#blueCard)" stroke="#2b7fb6" stroke-width="1.5"/>
+    <text x="672" y="444" fill="#9fe0ff" font-size="16" font-weight="700">📊 Observability Layer</text>
+    <text x="672" y="468" fill="#93b6cf" font-size="12.5">Arize Phoenix · Langfuse · claude-devtools</text>
+  </g>
+
+  <!-- 6 Self-Evolution -->
+  <g>
+    <path d="M590 530 L640 530" stroke="#ff8bd0" stroke-width="2.5" fill="none" marker-end="url(#arPk)"/>
+    <circle cx="628" cy="530" r="14" fill="#c04a9e"/>
+    <text x="628" y="535" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">6</text>
+    <rect x="648" y="498" width="480" height="66" rx="12" fill="url(#pinkCard)" stroke="#a4479a" stroke-width="1.5"/>
+    <text x="672" y="524" fill="#ffb0e6" font-size="16" font-weight="700">🧬 Self-Evolution Layer</text>
+    <text x="672" y="548" fill="#cf9ac4" font-size="12.5">Hermes Self-Evolution (DSPy + GEPA) · AHE</text>
+  </g>
+
+  <!-- Outcome: Autonomous Agent -->
+  <g>
+    <path d="M1128 130 C1180 130 1180 530 1200 340 M1128 210 L1175 340 M1128 290 L1175 340 M1128 370 L1175 340 M1128 450 L1175 340 M1128 530 L1175 340" stroke="none" fill="none"/>
+    <!-- simple converging lines -->
+    <path d="M1128 131 Q1170 240 1188 330" stroke="#6a5fcf" stroke-width="1.8" fill="none" opacity="0.6"/>
+    <path d="M1128 211 Q1165 275 1188 335" stroke="#2b7fb6" stroke-width="1.8" fill="none" opacity="0.6"/>
+    <path d="M1128 291 Q1160 315 1188 340" stroke="#1f8e56" stroke-width="1.8" fill="none" opacity="0.6"/>
+    <path d="M1128 371 Q1160 360 1188 345" stroke="#1f8e86" stroke-width="1.8" fill="none" opacity="0.6"/>
+    <path d="M1128 451 Q1165 405 1188 350" stroke="#2b7fb6" stroke-width="1.8" fill="none" opacity="0.6"/>
+    <path d="M1128 531 Q1170 440 1188 355" stroke="#a4479a" stroke-width="1.8" fill="none" opacity="0.6"/>
+
+    <rect x="1188" y="288" width="96" height="104" rx="14" fill="url(#greenCard)" stroke="#2fd07a" stroke-width="2" filter="url(#glow)"/>
+    <circle cx="1236" cy="322" r="17" fill="none" stroke="#4dffa0" stroke-width="2.5"/>
+    <path d="M1228 322 l6 6 l10 -12" stroke="#4dffa0" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1236" y="360" text-anchor="middle" fill="#8bf5be" font-size="12" font-weight="700">Autonomous</text>
+    <text x="1236" y="376" text-anchor="middle" fill="#8bf5be" font-size="12" font-weight="700">Agent</text>
+  </g>
+
+  <!-- Legend -->
+  <text x="650" y="628" text-anchor="middle" fill="#6a6f9c" font-size="12.5">Agent = Model + Harness  ·  the model reasons, the harness gives it hands, memory, tools, safety &amp; the ability to improve</text>
+
+  <!-- markers -->
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#555b8a"/></marker>
+    <marker id="arP" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#a99bff"/></marker>
+    <marker id="arB" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#5fd0ff"/></marker>
+    <marker id="arG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#5fffa8"/></marker>
+    <marker id="arPk" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#ff8bd0"/></marker>
+  </defs>
+</svg>
