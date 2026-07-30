@@ -1,4 +1,16 @@
 #https://github.com/walkinglabs/awesome-harness-engineering
+Links present in Link 2 but not in Link 1:
+
+1. https://github.com/walkinglabs/awesome-harness-engineering
+2. https://github.com/ai-boost/awesome-harness-engineering
+3. https://github.com/hoangnb24/repository-harness
+4. https://github.com/HKUDS/OpenHarness
+5. https://github.com/harness-community/harnesscd-example-apps
+6. https://github.com/harnessclaw/harnessclaw
+7. https://github.com/china-qijizhifeng/agentic-harness-engineering
+8. https://github.com/YennNing/Awesome-Code-as-Agent-Harness-Papers
+9. https://github.com/Ruhan-Wang/Harness_Handbook
+10. https://github.com/RyanAlberts/best-of-Agent-Harnesses
 
 Here's a significantly improved **system prompt** that is optimized for a capable LLM (GPT-5, Claude Opus, Gemini 2.5 Pro, etc.) to produce a high-quality executive presentation while preserving the existing deck.
 
