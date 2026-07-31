@@ -1,0 +1,8 @@
+check this image attached information is correct ,  then provide different versions for a Databricks presentation script . we will be creating slide by slide . trascript, script . so that will be used in presentation , so that i can read .
+provide different versions for script for this slide .  also try to convey - what is present in the slide , why this one etc 
+✅ DEMO SCRIPT (Professional Tone)
+✅ DEMO SCRIPT (Human / Conversational Tone)
+✅ DEMO SCRIPT (Technical / Architect Tone)
+✅ DEMO SCRIPT (Executive Storytelling Tone)
+✅ DEMO SCRIPT (Energetic / Marketing Tone)
+✅ DEMO SCRIPT (Minimalist / Straight-to-the-Point Tone
